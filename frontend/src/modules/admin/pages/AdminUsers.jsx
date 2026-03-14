@@ -24,11 +24,16 @@ const AdminUsers = () => {
     }));
   };
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.mobile.includes(searchTerm) ||
-    u.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const name = u?.name || "";
+    const mobile = u?.mobile || "";
+    const id = u?.id || "";
+    const search = (searchTerm || "").toLowerCase();
+
+    return name.toLowerCase().includes(search) || 
+           mobile.includes(search) ||
+           id.toLowerCase().includes(search);
+  });
 
   return (
     <AdminLayout title="Manage Users">

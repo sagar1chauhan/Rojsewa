@@ -24,8 +24,12 @@ const AdminFeedback = () => {
   };
 
   const filteredReviews = reviews.filter(r => {
-    const matchesSearch = r.author.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          r.comment.toLowerCase().includes(searchTerm.toLowerCase());
+    const author = r?.author || "";
+    const comment = r?.comment || "";
+    const search = (searchTerm || "").toLowerCase();
+
+    const matchesSearch = author.toLowerCase().includes(search) || 
+                          comment.toLowerCase().includes(search);
     const matchesFilter = filter === "all" || 
                           (filter === "positive" && r.rating >= 4) || 
                           (filter === "negative" && r.rating <= 3) ||

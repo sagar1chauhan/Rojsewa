@@ -83,9 +83,14 @@ const AdminProviders = () => {
   };
 
   const filteredProviders = providers.filter(p => {
-    const matchesSearch = p.shopName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.owner.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const sName = p?.shopName || "";
+    const oName = p?.owner || "";
+    const pId = p?.id || "";
+    const search = (searchTerm || "").toLowerCase();
+
+    const matchesSearch = sName.toLowerCase().includes(search) || 
+                          oName.toLowerCase().includes(search) ||
+                          pId.toLowerCase().includes(search);
     const matchesFilter = filter === "all" || p.status === filter;
     return matchesSearch && matchesFilter;
   });

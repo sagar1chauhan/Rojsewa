@@ -158,10 +158,14 @@ const AdminServices = () => {
     toast({ title: "Category Removed" });
   };
 
-  const filteredItems = (activeTab === "services" ? services : products).filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = (activeTab === "services" ? services : products).filter(s => {
+    const name = s?.name || "";
+    const category = s?.category || "";
+    const search = (searchTerm || "").toLowerCase();
+    
+    return name.toLowerCase().includes(search) || 
+           category.toLowerCase().includes(search);
+  });
 
   return (
     <AdminLayout title="Inventory Management">

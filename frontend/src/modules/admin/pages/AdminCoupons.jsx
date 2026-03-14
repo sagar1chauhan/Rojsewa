@@ -59,7 +59,11 @@ const AdminCoupons = () => {
     toast({ title: "Coupon Created", description: `Coupon ${coupon.code} is now live.` });
   };
 
-  const filteredCoupons = coupons.filter(c => c.code.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredCoupons = coupons.filter(c => {
+    const code = c?.code || "";
+    const search = (searchTerm || "").toLowerCase();
+    return code.toLowerCase().includes(search);
+  });
 
   return (
     <AdminLayout title="Manage Coupons">

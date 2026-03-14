@@ -59,7 +59,7 @@ const ShopDetail = () => {
   const adminProducts = JSON.parse(localStorage.getItem("rozsewa_admin_products") || "[]");
 
   const filteredServices = adminServices
-    .filter(s => s.category.toLowerCase() === provider.category.toLowerCase() && s.isVisible)
+    .filter(s => (s.category || "").toLowerCase() === (provider.category || "").toLowerCase() && s.isVisible)
     .map(s => ({ 
       id: s.id, 
       name: s.name, 
@@ -68,7 +68,7 @@ const ShopDetail = () => {
     }));
 
   const filteredProducts = adminProducts
-    .filter(p => p.category.toLowerCase() === provider.category.toLowerCase() && p.isVisible)
+    .filter(p => (p.category || "").toLowerCase() === (provider.category || "").toLowerCase() && p.isVisible)
     .map(p => ({
       id: p.id,
       name: p.name,

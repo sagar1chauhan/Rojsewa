@@ -22,30 +22,39 @@ const ShopListing = () => {
   const [sortBy, setSortBy] = useState("rating");
 
   const savedProviders = JSON.parse(localStorage.getItem("rozsewa_providers") || "[]");
-  const allProvidersList = savedProviders.length > 0 ? savedProviders.map(p => ({
-    id: p.id,
-    name: p.shopName,
-    category: p.category,
-    rating: p.rating || 4.0,
-    reviews: p.jobs || 0,
-    distance: "2.5 km",
-    price: "199",
-    image: p.image || `https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=300&fit=crop`,
-    verified: p.status === "approved",
-    emergency: p.category.toLowerCase().includes("ac") || p.category.toLowerCase().includes("electric")
-  })) : defaultProviders;
+  const allProvidersList = savedProviders.length > 0 ? savedProviders.map(p => {
+    const shopCat = p.category || "";
+    const shopName = p.shopName || p.name || "Unnamed Shop";
+    
+    return {
+      id: p.id,
+      name: shopName,
+      category: shopCat,
+      rating: p.rating || 4.0,
+      reviews: p.jobs || 0,
+      distance: "2.5 km",
+      price: "199",
+      image: p.image || `https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=300&fit=crop`,
+      verified: p.status === "approved",
+      emergency: shopCat.toLowerCase().includes("ac") || shopCat.toLowerCase().includes("electric")
+    };
+  }) : defaultProviders;
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
 
   const filtered = allProvidersList.filter((p) => {
+    const pCategory = p.category || "";
+    const pName = p.name || "";
+    const sQuery = searchQuery.toLowerCase();
+
     const matchesCategory = isEmergency
       ? p.emergency
       : category
-        ? p.category.toLowerCase() === category.toLowerCase()
+        ? pCategory.toLowerCase() === category.toLowerCase()
         : p.verified;
     
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = pName.toLowerCase().includes(sQuery) ||
+                          pCategory.toLowerCase().includes(sQuery);
     
     return matchesCategory && matchesSearch;
   });
