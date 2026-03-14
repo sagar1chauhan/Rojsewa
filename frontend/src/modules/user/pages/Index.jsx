@@ -44,7 +44,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <TopNav />
-      <main className="container max-w-6xl px-4 py-6 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-8">
         {/* Emergency Button - Dynamic based on Admin Setting */}
         {isEmergencyEnabled && (
           <motion.div

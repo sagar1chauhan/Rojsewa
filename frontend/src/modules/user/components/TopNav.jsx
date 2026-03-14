@@ -1,16 +1,25 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, ChevronDown, Bell, User, Moon, Sun } from "lucide-react";
-import { Link } from "react-router-dom";
+import { MapPin, ChevronDown, Bell, User, Moon, Sun, Search, Menu, X, Home, Store, ClipboardList, Zap, Heart } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/components/ui/use-toast";
 
 const cities = ["Lucknow", "Delhi", "Mumbai", "Bangalore", "Pune", "Hyderabad", "Kolkata", "Chennai"];
 
+const navLinks = [
+  { label: "Home", path: "/", icon: Home },
+  { label: "Services", path: "/shops", icon: Store },
+  { label: "My Bookings", path: "/my-bookings", icon: ClipboardList },
+  { label: "Favorites", path: "/favorites", icon: Heart },
+];
+
 const TopNav = () => {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [city, setCity] = useState(() => localStorage.getItem("rozsewa_user_city") || "Lucknow");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
+  const location = useLocation();
 
   const { toast } = useToast();
 
@@ -26,8 +35,6 @@ const TopNav = () => {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
-            // Simplified: In a real app we'd use reverse geocoding
-            // For this demo, let's pretend we detected their city
             const detectedCity = "Lucknow (Detected)"; 
             handleCitySelect(detectedCity);
             toast({
@@ -59,6 +66,8 @@ const TopNav = () => {
     }
   };
 
+  const isActive = (path) => location.pathname === path;
+
   return (
     <>
       <motion.header
@@ -66,48 +75,143 @@ const TopNav = () => {
         animate={{ y: 0, opacity: 1 }}
         className="sticky top-0 z-50 glass border-b border-border/50"
       >
-        <div className="container px-2 sm:px-4 flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center shrink-0 overflow-hidden w-[105px] sm:w-[120px]">
-            <img 
-              src="/RozSewa.png" 
-              alt="RozSewa Logo" 
-              className="h-10 sm:h-12 w-auto object-cover scale-[1.5] sm:scale-[1.3] origin-left" 
-            />
-          </Link>
+        {/* Desktop Navbar */}
+        <div className="hidden md:block">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="flex h-16 items-center gap-6">
+              {/* Logo */}
+              <Link to="/" className="flex items-center shrink-0 mr-2">
+                <img 
+                  src="/RozSewa.png" 
+                  alt="RozSewa Logo" 
+                  className="h-10 w-auto object-contain" 
+                />
+              </Link>
 
-          {/* Location */}
-          <button 
-            onClick={() => setShowLocationModal(true)}
-            className="flex shrink-0 items-center justify-center gap-1 rounded-full border border-border bg-background px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-sm font-medium transition-colors hover:bg-muted ml-auto mr-2 sm:mx-0"
-          >
-            <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
-            <span className="max-w-[70px] truncate sm:max-w-none select-none">{city}</span>
-            <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-          </button>
+              {/* Location Chip */}
+              <button 
+                onClick={() => setShowLocationModal(true)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium transition-all hover:bg-muted hover:border-primary/30 group"
+              >
+                <MapPin className="h-3.5 w-3.5 text-primary group-hover:scale-110 transition-transform" />
+                <span className="max-w-[100px] truncate select-none text-foreground/80">{city}</span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </button>
 
-          {/* Actions */}
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {/* Theme Toggle */}
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={toggleTheme}
-              className="relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-border transition-colors hover:bg-muted"
-              aria-label="Toggle theme"
-            >
-              {isDark ? (
-                <Sun className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />
-              ) : (
-                <Moon className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
-              )}
-            </motion.button>
-            <button className="relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-border transition-colors hover:bg-muted">
-              <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
-              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-destructive text-[9px] sm:text-[10px] font-bold text-destructive-foreground">3</span>
-            </button>
-            <Link to="/profile" className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20">
-              <User className="h-4 w-4 sm:h-5 sm:w-5" />
+              {/* Nav Links */}
+              <nav className="flex items-center gap-1 ml-2">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      isActive(link.path)
+                        ? "text-primary bg-primary/8"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    {link.label}
+                    {isActive(link.path) && (
+                      <motion.div
+                        layoutId="desktop-nav-indicator"
+                        className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-primary"
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Right Actions */}
+              <div className="flex items-center gap-2">
+                {/* Theme Toggle */}
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={toggleTheme}
+                  className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border transition-all hover:bg-muted hover:border-primary/30"
+                  aria-label="Toggle theme"
+                >
+                  {isDark ? (
+                    <Sun className="h-[18px] w-[18px] text-secondary" />
+                  ) : (
+                    <Moon className="h-[18px] w-[18px] text-foreground/70" />
+                  )}
+                </motion.button>
+
+                {/* Notifications */}
+                <Link 
+                  to="/notifications"
+                  className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border transition-all hover:bg-muted hover:border-primary/30"
+                >
+                  <Bell className="h-[18px] w-[18px] text-foreground/70" />
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-sm">3</span>
+                </Link>
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-border mx-1" />
+
+                {/* Profile */}
+                <Link 
+                  to="/profile" 
+                  className="flex items-center gap-2 rounded-full border border-border bg-background pl-1 pr-3 py-1 transition-all hover:bg-muted hover:border-primary/30 hover:shadow-sm group"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground/80">Account</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Navbar (unchanged behavior) */}
+        <div className="md:hidden">
+          <div className="container px-2 sm:px-4 flex h-14 items-center justify-between">
+            {/* Logo */}
+            <Link to="/" className="flex items-center shrink-0 overflow-hidden w-[105px] sm:w-[120px]">
+              <img 
+                src="/RozSewa.png" 
+                alt="RozSewa Logo" 
+                className="h-10 sm:h-12 w-auto object-cover scale-[1.5] sm:scale-[1.3] origin-left" 
+              />
             </Link>
+
+            {/* Location */}
+            <button 
+              onClick={() => setShowLocationModal(true)}
+              className="flex shrink-0 items-center justify-center gap-1 rounded-full border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:bg-muted ml-auto mr-2"
+            >
+              <MapPin className="h-3.5 w-3.5 text-primary" />
+              <span className="max-w-[70px] truncate select-none">{city}</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            </button>
+
+            {/* Actions */}
+            <div className="flex shrink-0 items-center gap-1">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={toggleTheme}
+                className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors hover:bg-muted"
+                aria-label="Toggle theme"
+              >
+                {isDark ? (
+                  <Sun className="h-4 w-4 text-secondary" />
+                ) : (
+                  <Moon className="h-4 w-4 text-foreground" />
+                )}
+              </motion.button>
+              <button className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors hover:bg-muted">
+                <Bell className="h-4 w-4 text-foreground" />
+                <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">3</span>
+              </button>
+              <Link to="/profile" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20">
+                <User className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </motion.header>
