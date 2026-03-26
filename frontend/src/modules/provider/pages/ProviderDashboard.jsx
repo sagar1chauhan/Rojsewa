@@ -91,8 +91,8 @@ const ProviderDashboard = () => {
               { icon: Headset, title: "Support", path: "/provider/support", color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
               { icon: Settings, title: "Settings", path: "/provider/settings", color: "text-gray-600 bg-gray-100 border-gray-200" }
             ].map((item, idx) => (
-              <Link key={idx} to={item.path} className={item.title === "99 Card Center" ? "col-span-2 md:col-span-1" : ""}>
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className={`flex flex-col items-center justify-center p-4 md:p-6 rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all text-center h-full ${item.title === "99 Card Center" ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200" : ""}`}>
+              <Link key={idx} to={item.path} className="">
+                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className={`flex flex-col items-center justify-center p-4 md:p-6 rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all text-center h-full ${item.title === "99 Card Center" ? "bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200" : ""}`}>
                   <div className={`p-3 md:p-4 rounded-full border ${item.color} mb-2 md:mb-3`}>
                     <item.icon className="h-5 w-5 md:h-6 md:w-6" />
                   </div>
