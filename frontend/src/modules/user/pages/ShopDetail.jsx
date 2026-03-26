@@ -1,281 +1,174 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, BadgeCheck, MapPin, Phone, MessageCircle, Plus, Minus, ShoppingCart, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Star, BadgeCheck, MapPin, Phone, MessageCircle, Plus, Minus, ShoppingCart, ShieldCheck, Camera, CheckCircle2, ChevronDown, CheckCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import TopNav from "@/modules/user/components/TopNav";
 import BottomNav from "@/modules/user/components/BottomNav";
 import { useToast } from "@/components/ui/use-toast";
-
-const defaultProviderFallback = {
-  id: "default",
-  name: "RojSewa Service",
-  category: "General",
-  rating: 4.5,
-  reviews: 120,
-  verified: true,
-  address: "Lucknow, India",
-  phone: "+91 9999999999",
-  price: "299",
-  image: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&h=400&fit=crop"
-};
-
-// categoryData is now handled dynamically inside the component
 
 const ShopDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [tab, setTab] = useState("services");
   const [cart, setCart] = useState({});
-  const [showCartWarning, setShowCartWarning] = useState(false);
+  const [selectedAddOns, setSelectedAddOns] = useState({}); // { planId: [addOnId1, addOnId2] }
   const { toast } = useToast();
-
-  const handleCall = () => {
-    toast({ title: "Connecting Call", description: `Dialing ${shopData.phone}...` });
-    window.location.href = `tel:${shopData.phone}`;
-  };
-
-  const handleChat = () => {
-    toast({ title: "Opening Chat", description: "Connecting to provider on WhatsApp..." });
-    window.location.href = `https://wa.me/${shopData.phone.replace(/[^0-9]/g, '')}?text=Hi, I'm interested in your services on RozSewa.`;
-  };
-
-  const savedProviders = JSON.parse(localStorage.getItem("rozsewa_providers") || "[]");
-  const foundProvider = savedProviders.find(p => p.id === id);
-  
-  const provider = foundProvider ? {
-    id: foundProvider.id,
-    name: foundProvider.shopName,
-    category: foundProvider.category,
-    rating: foundProvider.rating || 4.5,
-    reviews: foundProvider.jobs || 0,
-    verified: foundProvider.status === "approved",
-    address: foundProvider.location + ", Lucknow",
-    phone: foundProvider.mobile || "+91 0000000000",
-    price: "199",
-    image: foundProvider.image || "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&h=400&fit=crop"
-  } : defaultProviderFallback;
+  const [expandedPlan, setExpandedPlan] = useState(null);
 
   const adminServices = JSON.parse(localStorage.getItem("rozsewa_admin_services") || "[]");
-  const adminProducts = JSON.parse(localStorage.getItem("rozsewa_admin_products") || "[]");
+  const savedProviders = JSON.parse(localStorage.getItem("rozsewa_providers") || "[]");
+  const provider = savedProviders.find(p => p.id === id) || { name: "Tailor Shop", category: "Tailoring & Embroidery", rating: 4.8, reviews: 156, image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&h=400&fit=crop" };
 
-  const filteredServices = adminServices
-    .filter(s => (s.category || "").toLowerCase() === (provider.category || "").toLowerCase() && s.isVisible)
-    .map(s => ({ 
-      id: s.id, 
-      name: s.name, 
-      price: parseInt(s.price) || 299, 
-      duration: s.time || "45 min" 
-    }));
+  const servicesList = adminServices.filter(s => (s.category || "").toLowerCase().includes("tailor") || (s.category || "").toLowerCase() === (provider.category || "").toLowerCase());
 
-  const filteredProducts = adminProducts
-    .filter(p => (p.category || "").toLowerCase() === (provider.category || "").toLowerCase() && p.isVisible)
-    .map(p => ({
-      id: p.id,
-      name: p.name,
-      price: parseInt(p.price) || 499
-    }));
-
-  const shopData = {
-    ...provider,
-    banner: provider.image,
-    services: filteredServices.length > 0 ? filteredServices : [
-      { id: "s1", name: `${provider.category} Standard Service`, price: 299, duration: "1 hr" },
-      { id: "s2", name: `${provider.category} Premium Service`, price: 599, duration: "2 hrs" }
-    ],
-    products: filteredProducts.length > 0 ? filteredProducts : [
-      { id: "p1", name: `${provider.category} Essential Kit`, price: 499 }
-    ],
+  const toggleAddOn = (planId, addOn) => {
+    setSelectedAddOns(prev => {
+      const current = prev[planId] || [];
+      const exists = current.find(a => a.id === addOn.id);
+      if (exists) {
+        return { ...prev, [planId]: current.filter(a => a.id !== addOn.id) };
+      } else {
+        return { ...prev, [planId]: [...current, addOn] };
+      }
+    });
   };
 
-  const addToCart = (itemId) => {
-    setCart((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
+  const getPlanTotal = (planId, basePrice) => {
+    const adds = selectedAddOns[planId] || [];
+    const addsTotal = adds.reduce((sum, a) => sum + (parseInt(a.price) || 0), 0);
+    return basePrice + addsTotal;
   };
 
-  const removeFromCart = (itemId) => {
+  const addToCart = (planId) => { setCart((prev) => ({ ...prev, [planId]: (prev[planId] || 0) + 1 })); };
+  const removeFromCart = (planId) => {
     setCart((prev) => {
       const newCart = { ...prev };
-      if (newCart[itemId] > 1) newCart[itemId]--;
-      else delete newCart[itemId];
+      if (newCart[planId] > 1) newCart[planId]--;
+      else { delete newCart[planId]; delete selectedAddOns[planId]; }
       return newCart;
     });
   };
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
-  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
-    const service = shopData.services.find((s) => s.id === id);
-    const product = shopData.products.find((p) => p.id === id);
-    return sum + (service?.price || product?.price || 0) * qty;
+  const cartTotal = Object.entries(cart).reduce((sum, [pId, qty]) => {
+    const service = servicesList.find(s => s.id === pId.split('-')[0]);
+    const price = parseInt(service?.price) || 0;
+    return sum + (getPlanTotal(pId, price) * qty);
   }, 0);
 
+  const handleCheckout = () => {
+    const items = Object.entries(cart).map(([pId, qty]) => {
+      const service = servicesList.find(s => s.id === pId.split('-')[0]);
+      const adds = selectedAddOns[pId] || [];
+      const addsNames = adds.map(a => a.name).join(", ");
+      return { 
+        id: pId, 
+        name: service.name + (addsNames ? ` (+ ${addsNames})` : ""), 
+        price: getPlanTotal(pId, parseInt(service.price)), 
+        qty, 
+        duration: service.time || "1 hr" 
+      };
+    });
+    localStorage.setItem("rozsewa_checkout_data", JSON.stringify({ shopName: provider.name, category: provider.category, items, total: cartTotal }));
+    navigate("/checkout");
+  };
+
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-24 md:pb-0">
       <TopNav />
-      <main className="container max-w-4xl px-4 py-6 space-y-6">
-        {/* Banner */}
-        <div className="relative overflow-hidden rounded-2xl">
-          <img src={shopData.banner} alt={shopData.name} className="h-48 w-full object-cover sm:h-64" />
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full glass">
-            <ArrowLeft className="h-5 w-5" />
-          </motion.button>
+      {/* Hero Header */}
+      <div className="relative h-56 sm:h-72 w-full">
+        <img src={provider.image} alt={provider.name} className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 text-white p-6 flex flex-col justify-end">
+           <h1 className="text-2xl font-black">{provider.name}</h1>
+           <p className="text-xs font-bold text-white/70 uppercase tracking-widest">{provider.category}</p>
+        </div>
+      </div>
+
+      <main className="container max-w-2xl px-4 py-8 space-y-6">
+        <div className="flex bg-muted p-1 rounded-2xl">
+           <button onClick={() => setTab("services")} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all ${tab==='services'?'bg-card text-foreground shadow-sm':'text-muted-foreground'}`}>Select Style & Customization</button>
         </div>
 
-        {/* Shop Info */}
-        <div>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-extrabold text-foreground">{shopData.name}</h1>
-                {shopData.verified && <BadgeCheck className="h-5 w-5 text-primary" />}
-              </div>
-              <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><Star className="h-4 w-4 fill-secondary text-secondary" /> {shopData.rating} ({shopData.reviews})</span>
-                <span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> {shopData.address}</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={handleCall}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border hover:bg-muted transition-colors active:scale-90"
-              >
-                <Phone className="h-4 w-4 text-primary" />
-              </button>
-              <button 
-                onClick={handleChat}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border hover:bg-muted transition-colors active:scale-90"
-              >
-                <MessageCircle className="h-4 w-4 text-primary" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <div className="space-y-4">
+           {servicesList.map(service => {
+             const planId = `${service.id}-main`;
+             const isAdded = !!cart[planId];
+             
+             return (
+               <div key={service.id} className={`rounded-3xl border transition-all ${isAdded ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-border bg-card'}`}>
+                  <div className="p-5">
+                     <div className="flex gap-4">
+                        <img src={service.image} className="h-20 w-20 rounded-2xl object-cover shadow-sm" />
+                        <div className="flex-1">
+                           <h3 className="text-lg font-black text-foreground leading-tight">{service.name}</h3>
+                           <p className="text-sm font-black text-primary mt-1">Starting from ₹{service.price}</p>
+                        </div>
+                        <div className="shrink-0 flex items-center">
+                           {isAdded ? (
+                             <div className="flex items-center gap-3 bg-white shadow-sm border border-primary/20 p-1 rounded-xl">
+                                <button onClick={() => removeFromCart(planId)} className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center"><Minus className="h-4 w-4 text-primary" /></button>
+                                <span className="font-black text-sm">{cart[planId]}</span>
+                                <button onClick={() => addToCart(planId)} className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-md"><Plus className="h-4 w-4 text-white" /></button>
+                             </div>
+                           ) : (
+                             <button onClick={() => addToCart(planId)} className="bg-primary text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase shadow-lg shadow-primary/20 active:scale-95 transition-all">Add to Bag</button>
+                           )}
+                        </div>
+                     </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 rounded-xl bg-muted p-1">
-          {["services", "products"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded-lg py-2.5 text-sm font-semibold capitalize transition-all ${tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {/* Items */}
-        <div className="space-y-3">
-          {(tab === "services" ? shopData.services : shopData.products).map((item) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
-            >
-              <div>
-                <h4 className="text-sm font-bold text-card-foreground">{item.name}</h4>
-                {item.duration && <p className="text-xs text-muted-foreground">{item.duration}</p>}
-                <p className="mt-1 text-sm font-bold text-primary">₹{item.price}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {cart[item.id] ? (
-                  <div className="flex items-center gap-2 rounded-full border border-primary bg-accent px-2 py-1">
-                    <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeFromCart(item.id)} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-                      <Minus className="h-3.5 w-3.5 text-primary" />
-                    </motion.button>
-                    <span className="w-5 text-center text-sm font-bold text-foreground">{cart[item.id]}</span>
-                    <motion.button whileTap={{ scale: 0.8 }} onClick={() => addToCart(item.id)} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Plus className="h-3.5 w-3.5" />
-                    </motion.button>
+                     {/* Dynamic Add-Ons Section */}
+                     {(service.addOns || []).length > 0 && isAdded && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mt-6 pt-5 border-t border-dashed border-primary/20">
+                           <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-4">✨ Customize with Add-on Styles</h4>
+                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {service.addOns.map(addon => {
+                                const isSelected = (selectedAddOns[planId] || []).find(a => a.id === addon.id);
+                                return (
+                                  <button key={addon.id} onClick={() => toggleAddOn(planId, addon)} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${isSelected ? 'border-primary bg-primary/10' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
+                                     <div className={`h-8 w-8 rounded-full mb-2 flex items-center justify-center ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                        {isSelected ? <CheckCircle className="h-5 w-5" /> : <Plus className="h-4 w-4" />}
+                                     </div>
+                                     <p className="text-[10px] font-black leading-tight text-center">{addon.name}</p>
+                                     <p className="text-[9px] font-bold text-emerald-600 mt-1">+₹{addon.price}</p>
+                                  </button>
+                                );
+                              })}
+                           </div>
+                        </motion.div>
+                     )}
                   </div>
-                ) : (
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => addToCart(item.id)}
-                    className="rounded-full border-2 border-primary px-5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-                  >
-                    ADD
-                  </motion.button>
-                )}
-              </div>
-            </motion.div>
-          ))}
+                  
+                  {isAdded && (
+                    <div className="bg-primary/10 px-6 py-3 border-t border-primary/10 flex justify-between items-center rounded-b-3xl">
+                       <span className="text-[10px] font-black text-primary uppercase">Current Subtotal</span>
+                       <span className="text-sm font-black text-primary">₹{getPlanTotal(planId, parseInt(service.price))}</span>
+                    </div>
+                  )}
+               </div>
+             );
+           })}
         </div>
       </main>
 
-      {/* Cart Bar */}
+      {/* Cart Float */}
       <AnimatePresence>
         {cartCount > 0 && (
-          <motion.div
-            initial={{ y: 100 }}
-            animate={{ y: 0 }}
-            exit={{ y: 100 }}
-            className="fixed bottom-16 left-0 right-0 z-40 p-4 md:bottom-0"
-          >
-            <motion.button
-              onClick={() => {
-                // Save cart data for checkout
-                const cartItemsList = Object.entries(cart).map(([itemId, qty]) => {
-                  const service = shopData.services.find((s) => s.id === itemId);
-                  const product = shopData.products.find((p) => p.id === itemId);
-                  return { ...(service || product), qty };
-                });
-                localStorage.setItem("rozsewa_checkout_data", JSON.stringify({
-                  shopName: shopData.name,
-                  category: shopData.category,
-                  items: cartItemsList,
-                  total: cartTotal
-                }));
-                navigate("/checkout");
-              }}
-              className="flex w-full items-center justify-between rounded-2xl bg-primary px-6 py-4 shadow-xl"
-            >
-              <div className="flex items-center gap-3">
-                <ShoppingCart className="h-5 w-5 text-primary-foreground" />
-                <span className="text-sm font-bold text-primary-foreground">{cartCount} items</span>
-              </div>
-              <span className="text-lg font-extrabold text-primary-foreground">₹{cartTotal} →</span>
-            </motion.button>
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-24 left-0 right-0 z-40 p-4 md:bottom-4 flex justify-center pointer-events-none">
+            <div className="w-full max-w-2xl pointer-events-auto">
+              <motion.button onClick={handleCheckout} className="flex w-full items-center justify-between rounded-3xl bg-gray-900 px-6 py-5 shadow-2xl text-white">
+                <div className="text-left">
+                  <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{cartCount} Items in bag</p>
+                  <p className="text-xl font-black">₹{cartTotal}</p>
+                </div>
+                <div className="flex items-center gap-2 bg-white/10 px-5 py-2.5 rounded-2xl font-black text-xs uppercase">
+                  Proceed to Checkout <ArrowLeft className="h-4 w-4 rotate-180" />
+                </div>
+              </motion.button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Cart Warning Modal */}
-      <AnimatePresence>
-        {showCartWarning && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-4 md:items-center"
-          >
-            <motion.div
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
-            >
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/20">
-                  <AlertTriangle className="h-6 w-6 text-secondary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-card-foreground">Replace Cart?</h3>
-                  <p className="text-sm text-muted-foreground">Clear previous shop's cart to add this service?</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setShowCartWarning(false)} className="flex-1 rounded-xl border border-border py-3 text-sm font-semibold text-foreground hover:bg-muted">
-                  Cancel
-                </button>
-                <button onClick={() => { setCart({}); setShowCartWarning(false); }} className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">
-                  Clear & Add
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <BottomNav />
     </div>
   );

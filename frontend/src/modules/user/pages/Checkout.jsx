@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, MapPin, CreditCard, Wallet, Tag, Clock, Plus, Home, Briefcase, X, Check, ShieldCheck, Copy, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, CreditCard, Wallet, Tag, Clock, Plus, Home, Briefcase, X, Check, ShieldCheck, Copy, Navigation, Zap, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TopNav from "@/modules/user/components/TopNav";
 import BottomNav from "@/modules/user/components/BottomNav";
@@ -31,6 +31,11 @@ const Checkout = () => {
   const [serviceNotes, setServiceNotes] = useState("");
   const [appliedCouponData, setAppliedCouponData] = useState(null);
 
+  // New features
+  const [isExpress, setIsExpress] = useState(false);
+  const [isRequestingQuote, setIsRequestingQuote] = useState(false);
+  const EXPRESS_FEE = 150;
+
   // Address state
   const [addresses, setAddresses] = useState(() => {
     const saved = localStorage.getItem("rozsewa_saved_addresses");
@@ -53,6 +58,13 @@ const Checkout = () => {
     if (addresses.length > 0 && !selectedAddress) {
       setSelectedAddress(addresses[0]);
     }
+    
+    // Auto-load copied coupon
+    const lastCopied = localStorage.getItem("rozsewa_last_copied_coupon");
+    if (lastCopied) {
+      setCoupon(lastCopied);
+      localStorage.removeItem("rozsewa_last_copied_coupon");
+    }
   }, [addresses]);
 
   const applyCoupon = () => {
@@ -72,12 +84,12 @@ const Checkout = () => {
 
   const checkoutData = JSON.parse(localStorage.getItem("rozsewa_checkout_data")) || {
     shopName: "Provider",
-    category: "Salon",
-    items: [{ name: "Demo Service" }],
-    total: 497
+    category: "General",
+    items: [{ name: "Demo Service", price: 499, qty: 1 }],
+    total: 499
   };
 
-  const subtotal = checkoutData.total || 497;
+  const subtotal = checkoutData.total || 499;
   const serviceNames = checkoutData.items?.length > 0 ? checkoutData.items.map(i => i.name).join(", ") : "General Service";
   
   let discount = 0;
@@ -89,7 +101,8 @@ const Checkout = () => {
       discount = parseInt(appliedCouponData.discount.replace(/[^0-9]/g, "")) || 0;
     }
   }
-  const total = subtotal - discount;
+  
+  const total = subtotal - discount + (isExpress && !isRequestingQuote ? EXPRESS_FEE : 0);
 
   const handleDetectLocation = () => {
     if ("geolocation" in navigator) {
@@ -132,31 +145,37 @@ const Checkout = () => {
       setTimeout(() => {
         const id = `ROJ-${Date.now().toString(36).toUpperCase()}`;
         setBookingId(id);
-        // Get user profile if exists, else mock
         const userProfile = JSON.parse(localStorage.getItem("rozsewa_user_profile") || '{"name":"Sagar Chauhan","mobile":"9876543210"}');
         
-        // Save booking to localStorage with expanded fields for Provider/Admin simulation
         const booking = { 
           id, 
           user: userProfile.name || "Sagar Chauhan",
           userMobile: userProfile.mobile || "9876543210",
           providerId: null,
-          provider: "Unassigned",
-          category: checkoutData.category || "Salon", 
+          provider: checkoutData.shopName,
+          category: checkoutData.category || "General", 
           service: serviceNames, 
-          date: selectedDate, 
-          time: selectedTime, 
+          date: isExpress ? "ASAP" : selectedDate, 
+          time: isExpress ? "ASAP (Within 45 mins)" : selectedTime, 
           address: selectedAddress.address, 
           amount: total, 
           paymentMode, 
           paymentStatus: paymentMode === "now" ? "paid" : "pending",
           notes: serviceNotes, 
-          status: "pending", // Provider needs to accept it first
+          status: isRequestingQuote ? "quote_requested" : "pending",
+          isExpress,
           createdAt: new Date().toISOString() 
         };
         const bookings = JSON.parse(localStorage.getItem("rozsewa_bookings") || "[]");
-        bookings.unshift(booking); // Add to beginning of array
+        bookings.unshift(booking);
         localStorage.setItem("rozsewa_bookings", JSON.stringify(bookings));
+        
+        if (isRequestingQuote) {
+          toast({ title: "Quote Requested", description: "Providers will review and send you a final price." });
+          navigate("/my-bookings");
+          return;
+        }
+
         setBookingConfirmed(true);
         setShowOTPModal(false);
         setIsVerifying(false);
@@ -165,11 +184,20 @@ const Checkout = () => {
   };
 
   const handleConfirmBooking = () => {
-    if (!selectedTime) return;
+    if (!isExpress && !selectedTime) {
+      toast({ title: "Select Time", description: "Please select a time slot.", variant: "destructive" });
+      return;
+    }
     if (!selectedAddress) {
       toast({ title: "Select Address", description: "Please select a delivery address.", variant: "destructive" });
       return;
     }
+    
+    if (isRequestingQuote) {
+      const confirmQuote = window.confirm("You are submitting a quote request. Real cost may vary. Continue?");
+      if (!confirmQuote) return;
+    }
+    
     setShowOTPModal(true);
   };
 
@@ -179,53 +207,45 @@ const Checkout = () => {
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md text-center space-y-6">
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-            className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
-            <Check className="h-12 w-12 text-primary" />
+            className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/10">
+            <Check className="h-12 w-12 text-emerald-500" />
           </motion.div>
           <div>
-            <h1 className="text-2xl font-extrabold text-foreground">Booking Confirmed! 🎉</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Your service has been scheduled successfully.</p>
+            <h1 className="text-2xl font-black text-foreground">Booking Confirmed! 🎉</h1>
+            <p className="mt-2 text-sm font-medium text-muted-foreground leading-relaxed">Your service has been scheduled. A provider will be assigned shortly.</p>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 text-left">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Booking ID</span>
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-3 text-left shadow-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-border/50">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Booking ID</span>
               <button onClick={() => { navigator.clipboard.writeText(bookingId); toast({ title: "Copied!", description: bookingId }); }}
-                className="flex items-center gap-1 text-sm font-bold text-primary">
-                {bookingId} <Copy className="h-3 w-3" />
+                className="flex items-center gap-1.5 text-sm font-black text-primary hover:text-primary/80 transition-colors">
+                {bookingId} <Copy className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Date & Time</span>
-              <span className="text-sm font-semibold text-foreground">{selectedDate} • {selectedTime}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Date & Time</span>
+              <span className="text-sm font-black text-foreground">
+                {isExpress ? "ASAP (Within 45m)" : `${selectedDate} • ${selectedTime}`}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Amount</span>
-              <span className="text-sm font-bold text-foreground">₹{total}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Amount</span>
+              <span className="text-sm font-black text-primary">₹{total}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Payment</span>
-              <span className="text-sm font-semibold text-foreground">{paymentMode === "now" ? "Paid Online" : "Pay After Service"}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Payment</span>
+              <span className="text-sm font-black text-foreground">{paymentMode === "now" ? "Paid Online" : "Pay After Service"}</span>
             </div>
           </div>
 
-          {/* Cancellation Rules */}
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left">
-            <h4 className="text-xs font-bold text-primary mb-2">Cancellation Policy</h4>
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              <li>• Free cancellation within <span className="font-bold text-foreground">5 minutes</span> of booking.</li>
-              <li>• ₹50 cancellation fee after 5 minutes.</li>
-              <li>• No cancellation after provider starts travelling.</li>
-            </ul>
-          </div>
-
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-2">
             <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate("/tracking")}
-              className="flex-1 rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-lg">
+              className="flex-1 rounded-2xl bg-primary py-4 text-sm font-black text-primary-foreground shadow-xl shadow-primary/20 hover:shadow-2xl transition-all">
               Track Booking
             </motion.button>
             <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate("/my-bookings")}
-              className="flex-1 rounded-2xl border border-border py-3.5 text-sm font-bold text-foreground hover:bg-muted">
+              className="flex-1 rounded-2xl border-2 border-border py-4 text-sm font-extrabold text-foreground hover:bg-muted transition-colors">
               My Bookings
             </motion.button>
           </div>
@@ -236,188 +256,241 @@ const Checkout = () => {
 
   // ─── MAIN CHECKOUT ────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-28 md:pb-8">
       <TopNav />
       <main className="container max-w-2xl px-4 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-border hover:bg-muted">
-            <ArrowLeft className="h-5 w-5" />
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card hover:bg-muted">
+            <ArrowLeft className="h-5 w-5 text-foreground" />
           </motion.button>
-          <h1 className="text-xl font-bold text-foreground">Checkout</h1>
+          <div>
+            <h1 className="text-xl font-black text-foreground tracking-tight">Checkout</h1>
+            <p className="text-xs font-medium text-muted-foreground mt-0.5 line-clamp-1">{serviceNames}</p>
+          </div>
         </div>
 
-        {/* Date Picker */}
-        <section>
-          <h2 className="mb-3 text-sm font-bold text-foreground flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Select Date</h2>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {dates.map((d) => (
-              <motion.button key={d.full} whileTap={{ scale: 0.93 }} onClick={() => setSelectedDate(d.full)}
-                className={`flex min-w-[72px] flex-col items-center rounded-2xl border-2 py-3 px-4 transition-all ${
-                  selectedDate === d.full ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-card-foreground hover:bg-muted"
-                }`}>
-                <span className="text-[10px] font-semibold uppercase opacity-70">{d.day}</span>
-                <span className="text-xl font-extrabold">{d.date}</span>
-              </motion.button>
-            ))}
-          </div>
+        {/* Feature Toggles */}
+        <section className="grid grid-cols-2 gap-3">
+          <motion.div whileTap={{ scale: 0.98 }} onClick={() => { setIsExpress(!isExpress); setIsRequestingQuote(false); }}
+            className={`relative flex cursor-pointer flex-col p-4 rounded-2xl border-2 transition-all ${
+              isExpress ? "border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10" : "border-border bg-card hover:border-border/80"
+            }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className={`p-1.5 rounded-xl ${isExpress ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground"}`}><Zap className="h-4 w-4" /></div>
+              {isExpress && <Check className="h-4 w-4 text-amber-500" />}
+            </div>
+            <h3 className="text-sm font-black text-foreground">Express Service</h3>
+            <p className="text-[10px] font-bold text-muted-foreground leading-tight mt-1">Get it done within 45 mins (+₹{EXPRESS_FEE})</p>
+          </motion.div>
+
+          <motion.div whileTap={{ scale: 0.98 }} onClick={() => { setIsRequestingQuote(!isRequestingQuote); setIsExpress(false); setPaymentMode("after"); }}
+            className={`relative flex cursor-pointer flex-col p-4 rounded-2xl border-2 transition-all ${
+              isRequestingQuote ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10" : "border-border bg-card hover:border-border/80"
+            }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className={`p-1.5 rounded-xl ${isRequestingQuote ? "bg-blue-500 text-white" : "bg-muted text-muted-foreground"}`}><FileText className="h-4 w-4" /></div>
+              {isRequestingQuote && <Check className="h-4 w-4 text-blue-500" />}
+            </div>
+            <h3 className="text-sm font-black text-foreground">Request Quote</h3>
+            <p className="text-[10px] font-bold text-muted-foreground leading-tight mt-1">Submit details, get final pricing before payment</p>
+          </motion.div>
         </section>
 
-        {/* Time Slots */}
-        <section>
-          <h2 className="mb-3 text-sm font-bold text-foreground">Select Time</h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {timeSlots.map((t) => (
-              <motion.button key={t} whileTap={{ scale: 0.93 }} onClick={() => setSelectedTime(t)}
-                className={`rounded-xl py-2.5 text-xs font-semibold transition-all ${
-                  selectedTime === t ? "bg-primary text-primary-foreground" : "border border-border bg-card text-card-foreground hover:bg-muted"
-                }`}>{t}</motion.button>
-            ))}
-          </div>
-        </section>
+        <AnimatePresence mode="wait">
+          {!isExpress && !isRequestingQuote && (
+            <motion.div key="scheduling" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-6 overflow-hidden">
+              <section>
+                <h2 className="mb-3 text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Select Date</h2>
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                  {dates.map((d) => (
+                    <motion.button key={d.full} whileTap={{ scale: 0.93 }} onClick={() => setSelectedDate(d.full)}
+                      className={`flex min-w-[72px] flex-col items-center justify-center rounded-2xl border-2 py-3 transition-all ${
+                        selectedDate === d.full ? "border-primary bg-primary shadow-md shadow-primary/20 text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted"
+                      }`}>
+                      <span className="text-[10px] font-bold uppercase opacity-80 mb-1">{d.day}</span>
+                      <span className="text-xl font-black">{d.date}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </section>
 
-        {/* ─── Address Section ─────────────────────────── */}
-        <section className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-card-foreground flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Delivery Address</h3>
-            <button onClick={() => setShowAddressModal(true)} className="text-xs font-semibold text-primary hover:underline">Change</button>
+              <section>
+                <div className="grid grid-cols-3 gap-2">
+                  {timeSlots.map((t) => (
+                    <motion.button key={t} whileTap={{ scale: 0.95 }} onClick={() => setSelectedTime(t)}
+                      className={`rounded-xl py-3 px-2 text-xs font-bold transition-all ${
+                        selectedTime === t ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "border border-border bg-card text-foreground hover:bg-muted"
+                      }`}>{t}</motion.button>
+                  ))}
+                </div>
+              </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Address */}
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Location</h3>
+            <button onClick={() => setShowAddressModal(true)} className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-primary/20 transition-colors">Change</button>
           </div>
           {selectedAddress ? (
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                {selectedAddress.icon === "office" ? <Briefcase className="h-5 w-5 text-primary" /> : <Home className="h-5 w-5 text-primary" />}
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted">
+                {selectedAddress.icon === "office" ? <Briefcase className="h-6 w-6 text-foreground" /> : <Home className="h-6 w-6 text-foreground" />}
               </div>
-              <div>
-                <p className="text-sm font-bold text-card-foreground">{selectedAddress.label}</p>
-                <p className="text-xs text-muted-foreground line-clamp-1">{selectedAddress.address}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-foreground">{selectedAddress.label}</p>
+                <p className="text-xs font-medium text-muted-foreground mt-0.5 leading-snug truncate">{selectedAddress.address}</p>
               </div>
             </div>
           ) : (
-            <button onClick={() => setShowAddressModal(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary/40 text-sm font-semibold text-primary hover:bg-primary/5">
-              <Plus className="h-4 w-4" /> Add Address
+            <button onClick={() => setShowAddressModal(true)} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-border bg-muted/50 text-sm font-bold text-foreground hover:bg-muted transition-colors">
+              <Plus className="h-5 w-5" /> Add Delivery Address
             </button>
           )}
         </section>
 
-        {/* Coupon */}
-        <section className="relative rounded-2xl border border-border bg-card p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-card-foreground"><Tag className="h-4 w-4 text-secondary" /> Apply Coupon</h3>
-          <div className="flex gap-2">
-            <input type="text" value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="Enter coupon code" disabled={couponApplied}
-              className="flex-1 rounded-xl border border-input bg-background px-4 py-2.5 text-sm font-medium placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" />
-            <motion.button whileTap={{ scale: 0.93 }} onClick={applyCoupon} disabled={couponApplied}
-              className="rounded-xl bg-secondary px-5 py-2.5 text-sm font-bold text-secondary-foreground disabled:opacity-50">
-              {couponApplied ? "Applied ✓" : "Apply"}
-            </motion.button>
-          </div>
-          <AnimatePresence>
-            {showConfetti && (
-              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <motion.div key={i} initial={{ x: "50%", y: "50%", opacity: 1, scale: 0 }}
-                    animate={{ x: `${Math.random() * 100}%`, y: `${Math.random() * -150}%`, opacity: 0, scale: 1, rotate: Math.random() * 720 }}
-                    transition={{ duration: 1 + Math.random(), ease: "easeOut" }}
-                    className="absolute h-2 w-2 rounded-full"
-                    style={{ backgroundColor: ["#22c55e", "#eab308", "#ef4444", "#3b82f6", "#a855f7"][i % 5] }} />
-                ))}
+        {/* Notes */}
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <h3 className="mb-3 text-sm font-black uppercase tracking-wider text-muted-foreground">Service Notes / Instructions</h3>
+          <textarea placeholder="Any special instructions for the provider..." rows={2} value={serviceNotes} onChange={(e) => setServiceNotes(e.target.value)}
+            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+        </section>
+
+        {!isRequestingQuote && (
+          <>
+            {/* Coupon */}
+            <section className="relative rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-muted-foreground"><Tag className="h-4 w-4 text-emerald-500" /> Apply Promo</h3>
+                <button 
+                  onClick={() => navigate("/offers")}
+                  className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline transition-all"
+                >
+                  View All Offers
+                </button>
               </div>
-            )}
-          </AnimatePresence>
-        </section>
+              <div className="flex gap-2">
+                <input type="text" value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="Enter coupon code" disabled={couponApplied}
+                  className="flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm font-bold uppercase tracking-wider placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50 transition-all" />
+                <motion.button whileTap={{ scale: 0.95 }} onClick={applyCoupon} disabled={couponApplied || !coupon}
+                  className="rounded-xl bg-emerald-500 px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-xl shadow-emerald-500/20 disabled:opacity-50 transition-all">
+                  {couponApplied ? "Applied ✓" : "Apply"}
+                </motion.button>
+              </div>
+            </section>
 
-        {/* Service Notes */}
-        <section className="rounded-2xl border border-border bg-card p-4">
-          <h3 className="mb-2 text-sm font-bold text-card-foreground">Service Notes</h3>
-          <textarea placeholder="Any special instructions..." rows={3} value={serviceNotes} onChange={(e) => setServiceNotes(e.target.value)}
-            className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
-        </section>
+            {/* Price Summary */}
+            <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
+              <div className="flex justify-between text-sm"><span className="font-semibold text-muted-foreground">Subtotal</span><span className="font-black text-foreground">₹{subtotal}</span></div>
+              {isExpress && <div className="flex justify-between text-sm"><span className="font-semibold flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-amber-500"/> Express Fee</span><span className="font-black text-foreground">₹{EXPRESS_FEE}</span></div>}
+              {couponApplied && <div className="flex justify-between text-sm text-emerald-500"><span className="font-bold">Discount Applied</span><span className="font-black">-₹{discount}</span></div>}
+              <div className="border-t border-border pt-3 flex justify-between items-center">
+                <span className="text-sm font-black uppercase tracking-wider text-muted-foreground">Total To Pay</span>
+                <span className="text-xl font-black text-primary">₹{total}</span>
+              </div>
+            </section>
 
-        {/* Price Summary */}
-        <section className="rounded-2xl border border-border bg-card p-4 space-y-2">
-          <div className="flex justify-between text-sm text-card-foreground"><span>Subtotal</span><span className="font-semibold">₹{subtotal}</span></div>
-          {couponApplied && <div className="flex justify-between text-sm text-primary"><span>Discount (30%)</span><span className="font-semibold">-₹{discount}</span></div>}
-          <div className="border-t border-border pt-2 flex justify-between text-base font-extrabold text-foreground"><span>Total</span><span>₹{total}</span></div>
-        </section>
-
-        {/* Payment Mode */}
-        <section>
-          <h3 className="mb-3 text-sm font-bold text-foreground flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" /> Payment</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPaymentMode("now")}
-              className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all ${paymentMode === "now" ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
-              <CreditCard className={`h-6 w-6 ${paymentMode === "now" ? "text-primary" : "text-muted-foreground"}`} />
-              <span className="text-xs font-bold">Pay Now</span>
-            </motion.button>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPaymentMode("after")}
-              className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all ${paymentMode === "after" ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
-              <Wallet className={`h-6 w-6 ${paymentMode === "after" ? "text-primary" : "text-muted-foreground"}`} />
-              <span className="text-xs font-bold">Pay After Service</span>
-            </motion.button>
-          </div>
-        </section>
-
-        {/* Confirm */}
-        <motion.button whileTap={{ scale: 0.97 }} onClick={handleConfirmBooking} disabled={!selectedTime}
-          className="w-full rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground shadow-xl transition-opacity disabled:opacity-50">
-          Confirm Booking — ₹{total}
-        </motion.button>
+            {/* Payment Mode */}
+            <section>
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-muted-foreground"><CreditCard className="h-4 w-4 text-primary" /> Payment Method</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPaymentMode("now")}
+                  className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-2 p-5 transition-all ${paymentMode === "now" ? "border-primary bg-primary/10 shadow-md shadow-primary/10" : "border-border bg-card hover:bg-muted"}`}>
+                  <CreditCard className={`h-8 w-8 ${paymentMode === "now" ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className={`text-xs font-black uppercase tracking-wider ${paymentMode === "now" ? "text-primary" : "text-foreground"}`}>Pay Online</span>
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPaymentMode("after")}
+                  className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-2 p-5 transition-all ${paymentMode === "after" ? "border-primary bg-primary/10 shadow-md shadow-primary/10" : "border-border bg-card hover:bg-muted"}`}>
+                  <Wallet className={`h-8 w-8 ${paymentMode === "after" ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className={`text-xs font-black uppercase tracking-wider ${paymentMode === "after" ? "text-primary" : "text-foreground"}`}>Pay After Job</span>
+                </motion.button>
+              </div>
+            </section>
+          </>
+        )}
       </main>
-      <BottomNav />
 
-      {/* ─── ADDRESS SELECT MODAL ────────────────────── */}
+      {/* Floating Action */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t border-border p-4 pb-navbar md:pb-4 md:relative md:bg-transparent md:border-0 md:p-0 md:max-w-2xl md:mx-auto">
+        <motion.button whileTap={{ scale: 0.97 }} onClick={handleConfirmBooking}
+          className={`flex w-full items-center justify-between rounded-2xl py-4 px-6 shadow-2xl transition-all ${
+            isRequestingQuote 
+            ? "bg-blue-600 text-white shadow-blue-600/20" 
+            : "bg-primary text-primary-foreground shadow-primary/30"
+          }`}>
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">
+              {isRequestingQuote ? "Submit Details" : "Grand Total"}
+            </span>
+            <span className="text-xl font-black">
+              {isRequestingQuote ? "Request Quote" : `₹${total}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl bg-black/20 px-4 py-2 text-sm font-bold uppercase tracking-wider">
+            {isRequestingQuote ? "Submit" : "Confirm"} <ArrowLeft className="h-4 w-4 rotate-180" />
+          </div>
+        </motion.button>
+      </div>
+
+      {/* Modals -> Address Select Modal, Add Address Form, OTP Verification... (Kept identical structures, slightly styled up) */}
+      {/* ADDRESS SELECT MODAL */}
       <AnimatePresence>
         {showAddressModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 p-4">
-            <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
-              className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-card border border-border shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between border-b border-border p-4">
-                <h3 className="text-lg font-bold text-foreground">Select Address</h3>
-                <button onClick={() => { setShowAddressModal(false); setShowNewAddressForm(false); }} className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/50 backdrop-blur-sm p-4">
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="w-full max-w-md rounded-t-[32px] sm:rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between border-b border-border bg-muted/30 p-5 shrink-0">
+                <h3 className="text-base font-black text-foreground">Select Address</h3>
+                <button onClick={() => { setShowAddressModal(false); setShowNewAddressForm(false); }} className="rounded-full p-2 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><X className="h-5 w-5" /></button>
               </div>
-              <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+              <div className="p-5 space-y-3 overflow-y-auto">
                 {addresses.map(addr => (
                   <button key={addr.id} onClick={() => { setSelectedAddress(addr); setShowAddressModal(false); }}
-                    className={`w-full flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition-all ${
-                      selectedAddress?.id === addr.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
+                    className={`w-full flex items-center gap-4 rounded-2xl border-2 p-4 text-left transition-all ${
+                      selectedAddress?.id === addr.id ? "border-primary bg-primary/5 shadow-md shadow-primary/5" : "border-border hover:bg-muted hover:border-border/80"
                     }`}>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      {addr.icon === "office" ? <Briefcase className="h-5 w-5 text-primary" /> : <Home className="h-5 w-5 text-primary" />}
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80">
+                      {addr.icon === "office" ? <Briefcase className="h-6 w-6 text-foreground" /> : <Home className="h-6 w-6 text-foreground" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-foreground">{addr.label}</p>
-                      <p className="text-xs text-muted-foreground truncate">{addr.address}</p>
+                      <p className="text-sm font-black text-foreground">{addr.label}</p>
+                      <p className="text-xs font-medium text-muted-foreground truncate leading-relaxed">{addr.address}</p>
                     </div>
-                    {selectedAddress?.id === addr.id && <Check className="h-5 w-5 text-primary shrink-0" />}
+                    {selectedAddress?.id === addr.id && <div className="rounded-full bg-primary/20 p-1"><Check className="h-4 w-4 text-primary shrink-0" /></div>}
                   </button>
                 ))}
 
                 {!showNewAddressForm ? (
                   <button onClick={() => setShowNewAddressForm(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary/40 text-sm font-semibold text-primary hover:bg-primary/5">
-                    <Plus className="h-4 w-4" /> Add New Address
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-sm font-bold text-primary hover:bg-primary/10 transition-colors mt-2">
+                    <Plus className="h-5 w-5" /> Add New Address
                   </button>
                 ) : (
-                  <div className="space-y-3 rounded-2xl border border-border p-4">
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4 rounded-3xl border border-border bg-muted/30 p-5 mt-4">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground">New Address</h4>
                     <input type="text" placeholder="Label (e.g. Home, Office)" value={newAddress.label}
                       onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
-                      className="w-full rounded-xl border border-border bg-background p-3 text-sm focus:border-primary focus:outline-none" />
+                      className="w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm font-bold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                     <div className="relative">
                       <textarea rows={2} placeholder={isFetchingLocation ? "Detecting location..." : "Full address"} value={newAddress.address}
                         onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })} disabled={isFetchingLocation}
-                        className="w-full rounded-xl border border-border bg-background p-3 pr-10 text-sm focus:border-primary focus:outline-none disabled:opacity-70" />
+                        className="w-full rounded-xl border border-border bg-background p-4 pr-12 text-sm font-medium focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-70" />
                       <button type="button" onClick={handleDetectLocation}
-                        className="absolute top-3 right-3 text-primary hover:text-primary/80" title="Detect location">
+                        className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="Detect location">
                         <Navigation className={`h-4 w-4 ${isFetchingLocation ? "animate-pulse" : ""}`} />
                       </button>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-2">
                       <button onClick={() => setShowNewAddressForm(false)}
-                        className="flex-1 rounded-xl border border-border py-2.5 text-sm font-bold text-foreground hover:bg-muted">Cancel</button>
+                        className="flex-1 rounded-xl border border-border bg-background py-3.5 text-xs font-bold uppercase tracking-wider text-foreground hover:bg-muted transition-colors">Cancel</button>
                       <button onClick={handleSaveNewAddress}
-                        className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground">Save</button>
+                        className="flex-1 rounded-xl bg-primary py-3.5 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:shadow-xl">Save</button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             </motion.div>
@@ -425,28 +498,34 @@ const Checkout = () => {
         )}
       </AnimatePresence>
 
-      {/* ─── OTP VERIFICATION MODAL ──────────────────── */}
+      {/* OTP VERIFICATION MODAL */}
       <AnimatePresence>
         {showOTPModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="w-full max-w-sm rounded-3xl bg-card p-6 text-center shadow-2xl border border-border">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                <ShieldCheck className="h-7 w-7 text-primary" />
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/60 backdrop-blur-sm sm:items-center p-4">
+            <motion.div initial={{ y: "100%", scale: 1 }} animate={{ y: 0, scale: 1 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="w-full max-w-sm rounded-[32px] bg-card p-8 text-center shadow-2xl border border-border relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-emerald-500 to-primary opacity-50" />
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/10 shadow-inner">
+                <ShieldCheck className="h-10 w-10 text-primary" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">Verify Booking</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Enter OTP sent to your registered mobile</p>
-              <div className="mt-6 flex justify-center gap-3">
+              <h3 className="text-xl font-black text-foreground tracking-tight">Verify Booking</h3>
+              <p className="mt-2 text-sm font-medium text-muted-foreground px-4">Enter the 4-digit code sent to your registered mobile number.</p>
+              
+              <div className="mt-8 mb-2 flex justify-center gap-3">
                 {otp.map((d, i) => (
                   <input key={i} id={`checkout-otp-${i}`} type="text" inputMode="numeric" maxLength={1}
                     value={d} onChange={(e) => handleOtpChange(i, e.target.value)} disabled={isVerifying}
-                    className="h-14 w-14 rounded-xl border-2 border-border bg-background text-center text-2xl font-extrabold text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" />
+                    className="h-16 w-14 rounded-2xl border-2 border-border bg-muted/50 text-center text-2xl font-black text-foreground focus:border-primary focus:bg-background focus:outline-none focus:ring-4 focus:ring-primary/10 disabled:opacity-50 transition-all shadow-inner" />
                 ))}
               </div>
-              {isVerifying && <p className="mt-4 text-sm font-semibold text-primary animate-pulse">Verifying...</p>}
-              <button onClick={() => { setShowOTPModal(false); setOtp(["", "", "", ""]); }}
-                className="mt-5 text-sm font-semibold text-muted-foreground hover:text-foreground">Cancel</button>
+              
+              <div className="h-6 mt-4">
+                {isVerifying && <p className="text-sm font-bold text-primary animate-pulse flex items-center justify-center gap-2"><div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin"/> Verifying</p>}
+              </div>
+
+              <button onClick={() => { setShowOTPModal(false); setOtp(["", "", "", ""]); }} disabled={isVerifying}
+                className="mt-6 w-full rounded-2xl border border-border py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50">Cancel Verification</button>
             </motion.div>
           </motion.div>
         )}

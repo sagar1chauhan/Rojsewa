@@ -1,88 +1,167 @@
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Bell, Package, Tag, Info, Trash2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Bell, BellRing, PackageCheck, Tag, Info, Trash2, CheckCircle2, DollarSign, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TopNav from "@/modules/user/components/TopNav";
 import BottomNav from "@/modules/user/components/BottomNav";
-
-const initialNotifications = [
-  { id: 1, type: "order", title: "Booking Confirmed", desc: "Your AC Repair booking for 2:00 PM is confirmed.", time: "2 mins ago", unread: true },
-  { id: 2, type: "offer", title: "Weekend Mega Sale!", desc: "Get flat 40% OFF on all Salon services.", time: "1 hour ago", unread: true },
-  { id: 3, type: "info", title: "Welcome to RozSewa!", desc: "Thanks for joining. Start booking services now.", time: "1 day ago", unread: false },
-];
+import { useToast } from "@/components/ui/use-toast";
+import { getNotifications, markAsRead, markAllAsRead } from "@/lib/notifications";
 
 const Notifications = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [notifications, setNotifications] = useState([]);
 
-  const getIcon = (type) => {
+  useEffect(() => {
+    // Load customer targeted notifications
+    const target = "customer"; // In a real app, this would be based on user role
+    setNotifications(getNotifications(target));
+  }, []);
+
+  const handleMarkAsRead = (id) => {
+    markAsRead(id);
+    setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const handleMarkAllAsRead = () => {
+    markAllAsRead("customer");
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    toast({ title: "All Marked as Read" });
+  };
+
+  const handleClearAll = () => {
+    const all = JSON.parse(localStorage.getItem("rozsewa_notifications") || "[]");
+    const filteredOut = all.filter(n => n.target !== "customer" && n.target !== "all");
+    localStorage.setItem("rozsewa_notifications", JSON.stringify(filteredOut));
+    setNotifications([]);
+    toast({ title: "Notifications Cleared!" });
+  };
+
+  const deleteNotification = (id) => {
+    const all = JSON.parse(localStorage.getItem("rozsewa_notifications") || "[]");
+    const updated = all.filter(n => n.id !== id);
+    localStorage.setItem("rozsewa_notifications", JSON.stringify(updated));
+    setNotifications(notifications.filter(n => n.id !== id));
+  };
+
+  const getIconConfig = (type) => {
     switch(type) {
-      case 'order': return <Package className="h-5 w-5 text-blue-600" />;
-      case 'offer': return <Tag className="h-5 w-5 text-emerald-600" />;
-      default: return <Info className="h-5 w-5 text-amber-600" />;
+      case 'booking': return { icon: PackageCheck, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/30", outline: "border-blue-200 dark:border-blue-800" };
+      case 'promo': return { icon: Tag, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/30", outline: "border-emerald-200 dark:border-emerald-800" };
+      case 'payment': return { icon: DollarSign, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/30", outline: "border-amber-200 dark:border-amber-800" };
+      case 'alert': return { icon: AlertCircle, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-100 dark:bg-rose-900/30", outline: "border-rose-200 dark:border-rose-800" };
+      default: return { icon: Info, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-100 dark:bg-purple-900/30", outline: "border-purple-200 dark:border-purple-800" };
     }
   };
 
-  const getBg = (type) => {
-    switch(type) {
-      case 'order': return 'bg-blue-100';
-      case 'offer': return 'bg-emerald-100';
-      default: return 'bg-amber-100';
-    }
+  const groupByCategory = (notifs) => {
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    
+    return notifs.reduce((acc, notif) => {
+      const dateStr = new Date(notif.date).toDateString();
+      let group = "Older";
+      if (dateStr === today) group = "Today";
+      else if (dateStr === yesterday) group = "Yesterday";
+      
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(notif);
+      return acc;
+    }, {});
   };
+
+  const grouped = groupByCategory(notifications);
+  const groups = ["Today", "Yesterday", "Older"].filter(g => grouped[g] && grouped[g].length > 0);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-28 md:pb-8">
       <TopNav />
       <main className="container max-w-2xl px-4 py-6 space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-border hover:bg-muted">
-              <ArrowLeft className="h-5 w-5" />
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card hover:bg-muted transition-colors">
+              <ArrowLeft className="h-5 w-5 text-foreground" />
             </motion.button>
-            <h1 className="text-xl font-bold text-foreground">Notifications</h1>
-          </div>
-          <button className="text-xs font-bold text-primary flex items-center gap-1">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Mark all read
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          {initialNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 text-center">
-              <Bell className="h-12 w-12 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-sm font-bold text-muted-foreground">No notifications yet</p>
+            <div>
+              <h1 className="text-xl font-black text-foreground tracking-tight">Notifications</h1>
+              <p className="text-xs font-semibold text-muted-foreground">{unreadCount} unread message{unreadCount !== 1 && "s"}</p>
             </div>
-          ) : (
-            <AnimatePresence>
-              {initialNotifications.map((notif) => (
-                <motion.div
-                  key={notif.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`relative flex gap-4 rounded-2xl border p-4 transition-all ${notif.unread ? 'border-primary/20 bg-primary/5' : 'border-border bg-card opacity-80'}`}
-                >
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${getBg(notif.type)}`}>
-                    {getIcon(notif.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-sm font-black text-foreground">{notif.title}</h3>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">{notif.time}</span>
-                    </div>
-                    <p className="mt-1 text-xs font-medium text-muted-foreground">{notif.desc}</p>
-                    {notif.unread && (
-                      <div className="mt-2 h-1.5 w-1.5 rounded-full bg-primary" />
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+          </div>
+          {unreadCount > 0 && (
+            <button onClick={handleMarkAllAsRead} className="flex h-10 items-center gap-2 rounded-full bg-primary/10 px-4 text-xs font-bold text-primary hover:bg-primary/20 transition-colors">
+              <CheckCircle2 className="h-4 w-4" /> Mark All Read
+            </button>
           )}
         </div>
 
-        <button className="flex w-full items-center justify-center gap-2 py-4 text-xs font-black text-rose-500 uppercase tracking-widest hover:bg-rose-50 rounded-2xl transition-colors mt-8">
-          <Trash2 className="h-4 w-4" /> Clear All Notifications
-        </button>
+        {notifications.length === 0 ? (
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-20 text-center rounded-3xl border-2 border-dashed border-border bg-muted/10">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50 mb-6">
+              <BellRing className="h-10 w-10 text-muted-foreground/40" />
+            </div>
+            <h2 className="text-xl font-black text-foreground tracking-tight">You're all caught up!</h2>
+            <p className="text-sm font-medium text-muted-foreground mt-2 px-8 leading-relaxed">No new notifications right now. We'll let you know when there's an update.</p>
+          </motion.div>
+        ) : (
+          <div className="space-y-8">
+            {groups.map((group) => (
+              <div key={group}>
+                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-3">
+                  {group} <div className="h-px flex-1 bg-border/50" />
+                </h3>
+                <div className="space-y-3">
+                  <AnimatePresence>
+                    {grouped[group].map((notif, index) => {
+                      const conf = getIconConfig(notif.type);
+                      const Icon = conf.icon;
+                      
+                      return (
+                        <motion.div key={notif.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: index * 0.05 }}
+                          onClick={() => !notif.read && handleMarkAsRead(notif.id)}
+                          className={`group relative flex items-start gap-4 rounded-[24px] border border-border p-4 transition-all cursor-pointer overflow-hidden ${
+                            notif.read ? "bg-card hover:bg-muted/50" : "bg-primary/5 border-primary/20 shadow-lg shadow-primary/5"
+                          }`}>
+                          
+                          {/* Unread indicator line */}
+                          {!notif.read && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
+                          
+                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${conf.outline} ${conf.bg}`}>
+                            <Icon className={`h-5 w-5 ${conf.color}`} />
+                          </div>
+                          
+                          <div className="flex-1 min-w-0 pr-6">
+                            <div className="flex justify-between items-start gap-2">
+                              <h3 className={`text-sm font-bold truncate ${notif.read ? "text-foreground" : "text-foreground"}`}>{notif.title}</h3>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 shrink-0 mt-0.5">
+                                {new Date(notif.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className={`mt-1 text-xs leading-relaxed ${notif.read ? "text-muted-foreground" : "font-medium text-foreground/80 font-bold"}`}>{notif.body}</p>
+                          </div>
+
+                          <button onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600 hover:bg-rose-200 transition-all dark:bg-rose-900/30">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {notifications.length > 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-8">
+            <button onClick={handleClearAll} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-200 py-4 text-xs font-black uppercase tracking-widest text-rose-500 hover:border-rose-300 hover:bg-rose-50 transition-colors dark:border-rose-900/40 dark:hover:bg-rose-900/10">
+              <Trash2 className="h-4 w-4" /> Clear All Notifications
+            </button>
+          </motion.div>
+        )}
       </main>
       <BottomNav />
     </div>

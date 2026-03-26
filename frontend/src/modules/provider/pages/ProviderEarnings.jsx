@@ -2,12 +2,24 @@ import ProviderTopNav from "@/modules/provider/components/ProviderTopNav";
 import ProviderBottomNav from "@/modules/provider/components/ProviderBottomNav";
 import EarningsWidget from "@/modules/provider/components/EarningsWidget";
 import { Download, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import { Check } from "lucide-react";
 
 const ProviderEarnings = () => {
   const [isExporting, setIsExporting] = useState(false);
+  const [transactions, setTransactions] = useState([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const allBookings = JSON.parse(localStorage.getItem("rozsewa_bookings") || "[]");
+    const completed = allBookings.filter(b => b.status === "completed").sort((a,b) => {
+       const dA = new Date(a.date || a.timestamp || Date.now());
+       const dB = new Date(b.date || b.timestamp || Date.now());
+       return dB - dA;
+    });
+    setTransactions(completed);
+  }, []);
 
   const handleExport = () => {
     setIsExporting(true);
@@ -16,8 +28,7 @@ const ProviderEarnings = () => {
       setIsExporting(false);
       
       // Create a dummy CSV/JSON blob for download demonstration
-      const dummyData = JSON.stringify([{ date: "2026-03-10", type: "Settlement", amount: 1250, status: "Completed" }]);
-      const blob = new Blob([dummyData], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       
       const a = document.createElement("a");
@@ -57,9 +68,29 @@ const ProviderEarnings = () => {
 
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
           <h3 className="font-bold tracking-tight text-foreground">Recent Transactions</h3>
-          <div className="mt-4 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            <p className="text-sm">No transactions to display yet.</p>
-          </div>
+          {transactions.length === 0 ? (
+            <div className="mt-4 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+              <p className="text-sm">No transactions to display yet.</p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {transactions.slice(0, 10).map((t, idx) => (
+                <div key={t.id || idx} className="flex items-center justify-between p-4 rounded-xl border border-border bg-background shadow-sm">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground truncate">{t.service}</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t.user || "Customer"} • {new Date(t.date || t.timestamp || Date.now()).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-1">Ref: {t.id}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-base font-black text-emerald-600">+ ₹{t.amount || 0}</p>
+                    <span className="mt-1 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700 border border-emerald-100">
+                      <Check className="h-2.5 w-2.5" /> Settled
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
       <ProviderBottomNav />

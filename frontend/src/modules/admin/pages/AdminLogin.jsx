@@ -122,9 +122,6 @@ const AdminLogin = () => {
             </div>
             <div className="mt-6 grid grid-cols-1 gap-3 text-center">
               <p className="text-xs text-gray-500 font-mono">User: admin@rozsewa.com | Pass: admin123</p>
-              <Link to="/" className="text-sm font-semibold text-emerald-600 hover:text-emerald-500 flex items-center justify-center gap-1 mt-2">
-                <ArrowLeft className="h-4 w-4" /> Back to User App
-              </Link>
             </div>
           </div>
         </div>

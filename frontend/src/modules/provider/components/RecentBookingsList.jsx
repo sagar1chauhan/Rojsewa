@@ -6,11 +6,13 @@ import { useToast } from "@/components/ui/use-toast";
 const RecentBookingsList = () => {
   const [requests, setRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("pending");
+  const [staffList, setStaffList] = useState([]);
   const { toast } = useToast();
 
   const fetchBookings = () => {
     const allBookings = JSON.parse(localStorage.getItem("rozsewa_bookings") || "[]");
     setRequests(allBookings);
+    setStaffList(JSON.parse(localStorage.getItem("rozsewa_provider_staff") || "[]"));
   };
 
   useEffect(() => {
@@ -60,6 +62,30 @@ const RecentBookingsList = () => {
        description: `Booking ${id} status updated to ${action === 'complete' ? 'completed' : action + 'ed'}.`,
        variant: action === 'reject' ? "destructive" : "default"
     });
+  };
+
+  const assignStaff = (bookingId, staffId) => {
+    const targetStaff = staffList.find(s => s.id.toString() === staffId);
+    
+    const allBookings = JSON.parse(localStorage.getItem("rozsewa_bookings") || "[]");
+    const updatedBookings = allBookings.map(b => {
+      if (b.id === bookingId) {
+        return {
+           ...b,
+           assignedStaff: targetStaff ? targetStaff.name : null,
+           assignedStaffId: staffId !== "" ? staffId : null
+        };
+      }
+      return b;
+    });
+    localStorage.setItem("rozsewa_bookings", JSON.stringify(updatedBookings));
+    setRequests(updatedBookings);
+    
+    if (targetStaff) {
+      toast({ title: "Staff Assigned", description: `${targetStaff.name} has been assigned to the booking.` });
+    } else {
+      toast({ title: "Staff Unassigned", description: `Booking is no longer assigned to anyone.` });
+    }
   };
 
   const filteredRequests = requests.filter(req => req.status === activeTab);
@@ -152,6 +178,12 @@ const RecentBookingsList = () => {
                 <h3 className="text-lg font-black text-foreground truncate">{req.service || "Service"}</h3>
                 <p className="text-sm font-bold text-muted-foreground">{req.user || "Customer"}</p>
                 
+                {req.assignedStaff && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    <Check className="h-3 w-3" /> Assigned: {req.assignedStaff}
+                  </div>
+                )}
+                
                 <div className="mt-4 flex items-center justify-between">
                   <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">₹{req.amount || 0}</div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded-lg max-w-[140px]">
@@ -178,7 +210,20 @@ const RecentBookingsList = () => {
                 )}
 
                 {req.status === "active" && (
-                  <div className="mt-5">
+                  <div className="mt-5 space-y-3">
+                    <div className="border-t border-border pt-4">
+                      <label className="text-xs font-bold text-muted-foreground mb-1 block">Assign Staff</label>
+                      <select 
+                        value={req.assignedStaffId || ""} 
+                        onChange={(e) => assignStaff(req.id, e.target.value)}
+                        className="w-full text-sm rounded-xl border border-border bg-background px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="">Unassigned</option>
+                        {staffList.filter(s => s.status === 'Active').map(s => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+                        ))}
+                      </select>
+                    </div>
                     <button 
                       onClick={() => handleAction(req.id, 'complete')}
                       className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-500/20 bg-emerald-500/5 py-2.5 text-sm font-bold text-emerald-600 transition-all hover:bg-emerald-600 hover:text-white"
