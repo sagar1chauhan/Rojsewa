@@ -43,6 +43,18 @@ const ProviderRegister = () => {
   });
 
   const [generatedCode, setGeneratedCode] = useState("");
+  const [cardConfig, setCardConfig] = useState({ enabled: true, price: 99 });
+
+  useEffect(() => {
+     const settingsList = localStorage.getItem("rozsewa_platform_settings");
+     if (settingsList) {
+        const parsed = JSON.parse(settingsList);
+        setCardConfig({ 
+           enabled: parsed.vendorCardEnabled !== false, 
+           price: parsed.vendorCardPrice !== undefined ? parsed.vendorCardPrice : 99 
+        });
+     }
+  }, []);
 
   const fetchLocation = () => {
     if ("geolocation" in navigator) {
@@ -108,7 +120,20 @@ const ProviderRegister = () => {
 
   const handleReferralSubmit = (e) => {
     e.preventDefault();
-    setStep(5);
+    if (cardConfig.enabled) {
+       setStep(5);
+    } else {
+       setIsLoading(true);
+       setTimeout(() => {
+         setIsLoading(false);
+         const code = "RSVND" + Math.floor(10000 + Math.random() * 90000);
+         setGeneratedCode(code);
+         const finalData = { ...formData, address, vendorCode: code, status: "pending", joined: new Date().toISOString().split('T')[0] };
+         localStorage.setItem("rozsewa_provider_profile", JSON.stringify(finalData));
+         setStep(6);
+         toast({ title: "Registration Successful", description: "Profile generated." });
+       }, 1500);
+    }
   };
 
   const handlePayment = (e) => {
@@ -132,7 +157,7 @@ const ProviderRegister = () => {
     "Choose Business Type",
     "Business Profile",
     "Referral & Network",
-    "Join RozSewa Pro",
+    cardConfig.price > 0 ? `Join RozSewa Pro` : "Registration Options",
     "Welcome on Board!"
   ];
 
@@ -158,7 +183,7 @@ const ProviderRegister = () => {
             {stepTitles[step - 1]}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {step < 6 ? `Step ${step} of 5` : 'Registration Complete'}
+            {step < 6 ? `Step ${step} of ${cardConfig.enabled ? 5 : 4}` : 'Registration Complete'}
           </p>
         </div>
 
@@ -173,7 +198,7 @@ const ProviderRegister = () => {
             <div className="mb-6 md:mb-8 flex h-2 w-full overflow-hidden rounded-full bg-muted">
               <div 
                 className="h-full bg-emerald-600 transition-all duration-500 ease-in-out" 
-                style={{ width: `${(step / 5) * 100}%` }}
+                style={{ width: `${(step / (cardConfig.enabled ? 5 : 4)) * 100}%` }}
               ></div>
             </div>
           )}
@@ -364,10 +389,10 @@ const ProviderRegister = () => {
                   <div className="relative z-10">
                     <div className="flex flex-wrap justify-between items-start mb-4 md:mb-6 gap-2">
                       <div>
-                        <h3 className="text-lg md:text-xl font-black">RozSewa 99 Card</h3>
+                        <h3 className="text-lg md:text-xl font-black">{cardConfig.price > 0 ? `RozSewa ${cardConfig.price} Card` : 'RozSewa Vendor Card'}</h3>
                         <p className="text-emerald-100 text-[10px] md:text-xs mt-0.5 md:mt-1 font-semibold uppercase tracking-wider">Mandatory for Registration</p>
                       </div>
-                      <span className="rounded-full bg-white/20 px-3 py-1 text-xs md:text-sm font-bold backdrop-blur-md">₹99 / yr</span>
+                      <span className="rounded-full bg-white/20 px-3 py-1 text-xs md:text-sm font-bold backdrop-blur-md">₹{cardConfig.price} / yr</span>
                     </div>
                     
                     <ul className="space-y-2.5 md:space-y-3 text-xs md:text-sm font-medium">
@@ -387,7 +412,7 @@ const ProviderRegister = () => {
                   <button type="button" onClick={() => setStep(4)} className="flex w-1/3 justify-center items-center rounded-xl border border-border bg-card px-2 md:px-4 py-3 text-xs md:text-sm font-bold transition-all hover:bg-muted"><ArrowLeft className="mr-1 md:mr-2 h-4 md:h-5 w-4 md:w-5" /> Back</button>
                   <button type="submit" disabled={isLoading} className="flex w-2/3 justify-center items-center rounded-xl bg-emerald-600 px-4 py-3 text-xs md:text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 disabled:opacity-70">
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4 md:h-5 md:w-5" />}
-                    {isLoading ? "Processing..." : "Pay ₹99 & Join"}
+                    {isLoading ? "Processing..." : `Pay ₹${cardConfig.price} & Join`}
                   </button>
                 </div>
               </motion.form>

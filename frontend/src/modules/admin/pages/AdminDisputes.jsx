@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Clock, MessageSquare, Search, ChevronDown, IndianRupee } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 const AdminDisputes = () => {
+  const { setTitle } = useOutletContext();
   const { toast } = useToast();
   const [complaints, setComplaints] = useState(() => JSON.parse(localStorage.getItem("rozsewa_complaints") || "[]"));
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [activeNote, setActiveNote] = useState({ id: null, text: "" });
+
+  useEffect(() => {
+    setTitle("Disputes & Complaints");
+  }, [setTitle]);
 
   const statusColors = {
     open: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", icon: AlertTriangle },
@@ -96,11 +102,11 @@ const AdminDisputes = () => {
           const StatusIcon = statusConf.icon;
           return (
             <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-              className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3">
+              className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3 shadow-sm hover:shadow-md transition-all">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-mono text-muted-foreground">{c.id}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{c.id}</span>
                     <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${statusConf.bg}`}>
                       <StatusIcon className="h-3 w-3" /> {c.status === "in-review" ? "In Review" : c.status.charAt(0).toUpperCase() + c.status.slice(1)}
                     </span>
@@ -110,24 +116,24 @@ const AdminDisputes = () => {
                 </div>
                 <p className="text-[10px] text-muted-foreground">{new Date(c.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
               </div>
-              <p className="text-xs text-muted-foreground bg-muted/50 rounded-xl p-3">{c.description}</p>
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-xl p-3 border border-border/50">{c.description}</p>
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
                 {c.status !== "in-review" && c.status !== "resolved" && (
                   <button onClick={() => updateStatus(c.id, "in-review")}
-                    className="rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-500/20 transition-all">
+                    className="rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-500/20 transition-all active:scale-95">
                     Start Review
                   </button>
                 )}
                 {c.status !== "resolved" && (
                   <button onClick={() => updateStatus(c.id, "resolved")}
-                    className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all">
+                    className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all active:scale-95">
                     Mark Resolved
                   </button>
                 )}
                 <button onClick={() => setActiveNote({ id: c.id, text: c.adminNotes || "" })}
-                  className="rounded-lg bg-muted px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted/80 transition-all">
+                  className="rounded-lg bg-muted px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted/80 transition-all active:scale-95">
                   {c.adminNotes ? "Edit Note" : "Add Note"}
                 </button>
               </div>

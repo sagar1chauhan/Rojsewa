@@ -140,33 +140,36 @@ const App = () => (
                 <Route path="/provider/notifications" element={<ProviderNotifications />} />
                 <Route path="/provider/wallet" element={<ProviderWallet />} />
 
-                {/* Admin Routes */}
+                {/* Admin Routes with Persistent Layout */}
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="users" element={<AdminUsers />} />
+                  <Route path="providers" element={<AdminProviders />} />
+                  <Route path="bookings" element={<AdminBookings />} />
+                  <Route path="earnings" element={<AdminEarnings />} />
+                  <Route path="coupons" element={<AdminCoupons />} />
+                  <Route path="feedback" element={<AdminFeedback />} />
+                  <Route path="services" element={<AdminServices />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="disputes" element={<AdminDisputes />} />
+                  <Route path="banners" element={<AdminBanners />} />
+                  <Route path="notifications" element={<AdminNotifications />} />
+                  <Route path="activity-log" element={<AdminActivityLog />} />
+                  <Route path="kyc" element={<AdminKYC />} />
+                  <Route path="99cards" element={<Admin99Card />} />
+                  <Route path="commission" element={<AdminCommission />} />
+                  <Route path="offers" element={<AdminOffers />} />
+                  <Route path="zones" element={<AdminZones />} />
+                  <Route path="dispatch" element={<AdminDispatch />} />
+                  <Route path="emergency" element={<AdminEmergency />} />
+                  <Route path="finance" element={<AdminFinance />} />
+                  <Route path="quality" element={<AdminQuality />} />
+                  <Route path="master-data" element={<AdminSystem />} />
+                  <Route path="promotions" element={<AdminSystem />} />
+                  <Route path="help-training" element={<AdminHelpTraining />} />
+                </Route>
+
                 <Route path="/admin/login" element={<AdminLogin />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/providers" element={<AdminProviders />} />
-                <Route path="/admin/bookings" element={<AdminBookings />} />
-                <Route path="/admin/earnings" element={<AdminEarnings />} />
-                <Route path="/admin/coupons" element={<AdminCoupons />} />
-                <Route path="/admin/feedback" element={<AdminFeedback />} />
-                <Route path="/admin/services" element={<AdminServices />} />
-                <Route path="/admin/settings" element={<AdminSettings />} />
-                <Route path="/admin/disputes" element={<AdminDisputes />} />
-                <Route path="/admin/banners" element={<AdminBanners />} />
-                <Route path="/admin/notifications" element={<AdminNotifications />} />
-                <Route path="/admin/activity-log" element={<AdminActivityLog />} />
-                <Route path="/admin/kyc" element={<AdminKYC />} />
-                <Route path="/admin/99cards" element={<Admin99Card />} />
-                <Route path="/admin/commission" element={<AdminCommission />} />
-                <Route path="/admin/offers" element={<AdminOffers />} />
-                <Route path="/admin/zones" element={<AdminZones />} />
-                <Route path="/admin/dispatch" element={<AdminDispatch />} />
-                <Route path="/admin/emergency" element={<AdminEmergency />} />
-                <Route path="/admin/finance" element={<AdminFinance />} />
-                <Route path="/admin/quality" element={<AdminQuality />} />
-                <Route path="/admin/master-data" element={<AdminSystem />} />
-                <Route path="/admin/promotions" element={<AdminSystem />} />
-                <Route path="/admin/help-training" element={<AdminHelpTraining />} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>

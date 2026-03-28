@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Activity, Search, Clock, User, Settings, Shield, AlertTriangle, CheckCircle2 } from "lucide-react";
 
@@ -22,12 +23,17 @@ const defaultLogs = [
 ];
 
 const AdminActivityLog = () => {
+  const { setTitle } = useOutletContext();
   const [logs] = useState(() => {
     const saved = JSON.parse(localStorage.getItem("rozsewa_admin_activity_log") || "[]");
     return saved.length > 0 ? saved : defaultLogs;
   });
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
+
+  useEffect(() => {
+    setTitle("System Logs");
+  }, [setTitle]);
 
   const filtered = logs
     .filter(l => filterType === "all" || l.type === filterType)

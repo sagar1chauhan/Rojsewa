@@ -1,11 +1,12 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, Outlet } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopNav from "./AdminTopNav";
 import AdminMobileNav from "./AdminMobileNav";
 
-const AdminLayout = ({ title, children }) => {
+const AdminLayout = () => {
   const navigate = useNavigate();
+  const [title, setTitle] = useState("Dashboard");
 
   useEffect(() => {
     const token = localStorage.getItem("rozsewa_admin_token");
@@ -22,7 +23,7 @@ const AdminLayout = ({ title, children }) => {
       <div className="flex flex-1 flex-col overflow-hidden">
         <AdminTopNav title={title} />
         <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
-          {children}
+          <Outlet context={{ setTitle }} />
         </main>
         <AdminMobileNav />
       </div>

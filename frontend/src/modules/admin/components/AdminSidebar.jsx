@@ -14,7 +14,7 @@ const links = [
   { path: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { path: "/admin/dispatch", label: "Job Dispatching", icon: Zap },
   { path: "/admin/emergency", label: "24x7 Emergency", icon: ShieldAlert },
-  { path: "/admin/99cards", label: "99 Card Sales", icon: CreditCard },
+  { path: "/admin/99cards", label: "Vendor Card Sales", icon: CreditCard },
   { path: "/admin/commission", label: "Settlements", icon: Landmark },
   { path: "/admin/finance", label: "Finance & GST", icon: Wallet },
   { path: "/admin/earnings", label: "Earnings", icon: IndianRupee },
