@@ -1,168 +1,341 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, BadgeCheck, MapPin, Phone, MessageCircle, Plus, Minus, ShoppingCart, ShieldCheck, Camera, CheckCircle2, ChevronDown, CheckCircle } from "lucide-react";
+import { ArrowLeft, Star, BadgeCheck, MapPin, Phone, MessageCircle, Plus, Minus, ShoppingCart, ShieldCheck, Camera, CheckCircle2, ChevronDown } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import TopNav from "@/modules/user/components/TopNav";
 import BottomNav from "@/modules/user/components/BottomNav";
 import { useToast } from "@/components/ui/use-toast";
 
+const defaultProviderFallback = {
+  id: "default",
+  name: "RojSewa Expert",
+  category: "General",
+  rating: 4.8,
+  reviews: 156,
+  verified: true,
+  address: "Lucknow, India",
+  phone: "+91 9999999999",
+  about: "Professional service provider with 5+ years of experience in delivering high-quality results.",
+  qualifications: ["Background Verified", "Trained Professional", "5+ Years Exp", "COVID Vaccinated"],
+  warranty: "30-Day Service Warranty",
+  image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&h=400&fit=crop"
+};
+
+const fakePortfolio = [
+  { id: 1, before: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&h=300&fit=crop", after: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=400&h=300&fit=crop" },
+  { id: 2, before: "https://images.unsplash.com/photo-1563453392212-326f5e854473?w=400&h=300&fit=crop", after: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=300&fit=crop" },
+];
+
+const fakeReviews = [
+  { id: 1, user: "Amit K.", rating: 5, date: "2 days ago", text: "Excellent service! Very professional and on time." },
+  { id: 2, user: "Priya S.", rating: 4, date: "1 week ago", text: "Good work, but arrived 10 mins late. Overall satisfied." },
+  { id: 3, user: "Rahul M.", rating: 5, date: "2 weeks ago", text: "Saved my day! Fixed the issue in no time." },
+];
+
 const ShopDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [tab, setTab] = useState("services");
+  const [tab, setTab] = useState("services"); // services | reviews | about
   const [cart, setCart] = useState({});
-  const [selectedAddOns, setSelectedAddOns] = useState({}); // { planId: [addOnId1, addOnId2] }
   const { toast } = useToast();
   const [expandedPlan, setExpandedPlan] = useState(null);
+  const [serviceFilter, setServiceFilter] = useState("all");
 
-  const adminServices = JSON.parse(localStorage.getItem("rozsewa_admin_services") || "[]");
   const savedProviders = JSON.parse(localStorage.getItem("rozsewa_providers") || "[]");
-  const provider = savedProviders.find(p => p.id === id) || { name: "Tailor Shop", category: "Tailoring & Embroidery", rating: 4.8, reviews: 156, image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&h=400&fit=crop" };
+  const foundProvider = savedProviders.find(p => p.id === id);
+  
+  const provider = foundProvider ? {
+    ...defaultProviderFallback,
+    id: foundProvider.id,
+    name: foundProvider.shopName,
+    category: foundProvider.category,
+    rating: foundProvider.rating || 4.5,
+    reviews: foundProvider.jobs || 0,
+    verified: foundProvider.status === "approved",
+    address: foundProvider.location + ", Lucknow",
+    phone: foundProvider.mobile || "+91 0000000000",
+  } : defaultProviderFallback;
 
-  const servicesList = adminServices.filter(s => (s.category || "").toLowerCase().includes("tailor") || (s.category || "").toLowerCase() === (provider.category || "").toLowerCase());
+  // Let's use Provider's own services if available, fallback to admin services
+  const providerServices = JSON.parse(localStorage.getItem("rozsewa_provider_my_services") || "[]");
+  const adminServices = JSON.parse(localStorage.getItem("rozsewa_admin_services") || "[]");
 
-  const toggleAddOn = (planId, addOn) => {
-    setSelectedAddOns(prev => {
-      const current = prev[planId] || [];
-      const exists = current.find(a => a.id === addOn.id);
-      if (exists) {
-        return { ...prev, [planId]: current.filter(a => a.id !== addOn.id) };
-      } else {
-        return { ...prev, [planId]: [...current, addOn] };
-      }
-    });
-  };
+  let servicesList = providerServices.filter(s => s.visible).map(s => ({
+    id: s.id, name: s.name, description: s.description, duration: s.duration, image: s.image,
+    serviceType: s.serviceType || "both",
+    plans: [
+      { id: `${s.id}-basic`, name: "Basic", price: parseInt(s.basic) || 299, desc: "Standard service checkup" },
+      ...(s.standard ? [{ id: `${s.id}-standard`, name: "Standard", price: parseInt(s.standard), desc: "Deep cleaning & service" }] : []),
+      ...(s.premium ? [{ id: `${s.id}-premium`, name: "Premium", price: parseInt(s.premium), desc: "Comprehensive care + parts check" }] : []),
+    ]
+  }));
 
-  const getPlanTotal = (planId, basePrice) => {
-    const adds = selectedAddOns[planId] || [];
-    const addsTotal = adds.reduce((sum, a) => sum + (parseInt(a.price) || 0), 0);
-    return basePrice + addsTotal;
-  };
+  if (servicesList.length === 0) {
+    const adminS = adminServices.filter(s => (s.category || "").toLowerCase() === (provider.category || "").toLowerCase() && s.isVisible);
+    if(adminS.length > 0) {
+      servicesList = adminS.map(s => ({
+        id: s.id, name: s.name, duration: s.time || "1 hr", image: s.image,
+        serviceType: s.serviceType || "home",
+        plans: [{ id: `${s.id}-std`, name: "Standard Option", price: parseInt(s.price) || 299, desc: s.details || "Standard service delivery" }]
+      }));
+    } else {
+      servicesList = [
+        { id: "s1", name: `${provider.category} Deep Cleaning`, duration: "1.5 hrs", description: "Complete internal and external cleaning.", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&q=80", serviceType: "home", plans: [
+          { id: "s1-b", name: "Basic", price: 299, desc: "Basic external wipe & check" },
+          { id: "s1-s", name: "Standard", price: 599, desc: "Deep cleaning + chemical wash" },
+          { id: "s1-p", name: "Premium", price: 999, desc: "Standard + 3 month warranty" }
+        ]}
+      ];
+    }
+  }
+
+  const handleCall = () => { window.location.href = `tel:${provider.phone}`; };
+  const handleChat = () => { window.location.href = `https://wa.me/${provider.phone.replace(/[^0-9]/g, '')}?text=Hi, I want to book a service.`; };
 
   const addToCart = (planId) => { setCart((prev) => ({ ...prev, [planId]: (prev[planId] || 0) + 1 })); };
   const removeFromCart = (planId) => {
     setCart((prev) => {
       const newCart = { ...prev };
       if (newCart[planId] > 1) newCart[planId]--;
-      else { delete newCart[planId]; delete selectedAddOns[planId]; }
+      else delete newCart[planId];
       return newCart;
     });
   };
 
+  const getPlanDetails = (planId) => {
+    for (const s of servicesList) {
+      const p = s.plans.find(pl => pl.id === planId);
+      if (p) return { serviceName: s.name, planName: p.name, price: p.price, duration: s.duration };
+    }
+    return null;
+  };
+
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
-  const cartTotal = Object.entries(cart).reduce((sum, [pId, qty]) => {
-    const service = servicesList.find(s => s.id === pId.split('-')[0]);
-    const price = parseInt(service?.price) || 0;
-    return sum + (getPlanTotal(pId, price) * qty);
+  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
+    const p = getPlanDetails(id);
+    return sum + (p?.price || 0) * qty;
   }, 0);
 
   const handleCheckout = () => {
-    const items = Object.entries(cart).map(([pId, qty]) => {
-      const service = servicesList.find(s => s.id === pId.split('-')[0]);
-      const adds = selectedAddOns[pId] || [];
-      const addsNames = adds.map(a => a.name).join(", ");
-      return { 
-        id: pId, 
-        name: service.name + (addsNames ? ` (+ ${addsNames})` : ""), 
-        price: getPlanTotal(pId, parseInt(service.price)), 
-        qty, 
-        duration: service.time || "1 hr" 
-      };
+    const items = Object.entries(cart).map(([id, qty]) => {
+      const d = getPlanDetails(id);
+      return { id, name: `${d.serviceName} (${d.planName})`, price: d.price, qty, duration: d.duration };
     });
-    localStorage.setItem("rozsewa_checkout_data", JSON.stringify({ shopName: provider.name, category: provider.category, items, total: cartTotal }));
+    localStorage.setItem("rozsewa_checkout_data", JSON.stringify({
+      shopName: provider.name, category: provider.category, items, total: cartTotal
+    }));
     navigate("/checkout");
   };
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
       <TopNav />
-      {/* Hero Header */}
-      <div className="relative h-56 sm:h-72 w-full">
+      {/* Hero Banner */}
+      <div className="relative h-56 sm:h-72 w-full bg-muted">
         <img src={provider.image} alt={provider.name} className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 text-white p-6 flex flex-col justify-end">
-           <h1 className="text-2xl font-black">{provider.name}</h1>
-           <p className="text-xs font-bold text-white/70 uppercase tracking-widest">{provider.category}</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} 
+          className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30">
+          <ArrowLeft className="h-5 w-5" />
+        </motion.button>
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-black text-white">{provider.name}</h1>
+                {provider.verified && <BadgeCheck className="h-6 w-6 text-primary" />}
+              </div>
+              <div className="mt-1.5 flex items-center gap-4 text-xs font-semibold text-white/90">
+                <span className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-amber-300 backdrop-blur-md"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {provider.rating} ({provider.reviews})</span>
+                <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 opacity-70" /> {provider.address}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <motion.button whileTap={{ scale: 0.9 }} onClick={handleCall} className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 backdrop-blur-md text-primary-foreground hover:bg-primary/40"><Phone className="h-4 w-4" /></motion.button>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={handleChat} className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 backdrop-blur-md text-emerald-400 hover:bg-emerald-500/40"><MessageCircle className="h-4 w-4" /></motion.button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <main className="container max-w-2xl px-4 py-8 space-y-6">
-        <div className="flex bg-muted p-1 rounded-2xl">
-           <button onClick={() => setTab("services")} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all ${tab==='services'?'bg-card text-foreground shadow-sm':'text-muted-foreground'}`}>Select Style & Customization</button>
+      <main className="container max-w-2xl px-4 py-6 space-y-6">
+        {/* Trust Badges */}
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          {provider.warranty && (
+            <div className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-50 dark:bg-emerald-900/10 px-3 py-2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+              <ShieldCheck className="h-3.5 w-3.5" /> {provider.warranty}
+            </div>
+          )}
+          {provider.qualifications.map(q => (
+            <div key={q} className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> {q}
+            </div>
+          ))}
         </div>
 
-        <div className="space-y-4">
-           {servicesList.map(service => {
-             const planId = `${service.id}-main`;
-             const isAdded = !!cart[planId];
-             
-             return (
-               <div key={service.id} className={`rounded-3xl border transition-all ${isAdded ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-border bg-card'}`}>
-                  <div className="p-5">
-                     <div className="flex gap-4">
-                        <img src={service.image} className="h-20 w-20 rounded-2xl object-cover shadow-sm" />
+        {/* Tabs */}
+        <div className="flex rounded-xl bg-muted p-1">
+          {[{id:"services", label:"Services"}, {id:"reviews", label:"Reviews"}, {id:"about", label:"About"}].map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${tab === t.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {tab === "services" && (
+            <motion.div key="services" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+              
+              <div className="flex bg-muted p-1 rounded-xl text-xs font-bold mb-4">
+                 <button onClick={() => setServiceFilter('all')} className={`flex-1 py-2 rounded-lg transition-all ${serviceFilter==='all'?'bg-card text-foreground shadow-sm':'text-muted-foreground'}`}>All Services</button>
+                 <button onClick={() => setServiceFilter('home')} className={`flex-1 py-2 rounded-lg transition-all ${serviceFilter==='home'?'bg-card text-foreground shadow-sm':'text-muted-foreground'}`}>Home Visit</button>
+                 <button onClick={() => setServiceFilter('24x7')} className={`flex-1 py-2 rounded-lg transition-all ${serviceFilter==='24x7'?'bg-card text-foreground shadow-sm':'text-muted-foreground'}`}>24x7 Emergency</button>
+              </div>
+
+              {servicesList.filter(s => serviceFilter === 'all' || s.serviceType === serviceFilter || s.serviceType === 'both').length === 0 ? (
+                 <p className="text-center text-sm font-semibold text-muted-foreground py-8">No services found for this filter.</p>
+              ) : (
+                servicesList.filter(s => serviceFilter === 'all' || s.serviceType === serviceFilter || s.serviceType === 'both').map((service, idx) => (
+                  <div key={service.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+                  <div className="p-4" onClick={() => setExpandedPlan(expandedPlan === service.id ? null : service.id)}>
+                    <div className="flex items-start justify-between gap-4 cursor-pointer">
+                      <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                        {(service.image || "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=100&h=100&fit=crop") && (
+                          <img src={service.image || "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=100&h=100&fit=crop"} alt={service.name} className="h-16 w-32 sm:h-20 sm:w-24 shrink-0 rounded-xl object-cover border border-border bg-muted shadow-sm" />
+                        )}
                         <div className="flex-1">
-                           <h3 className="text-lg font-black text-foreground leading-tight">{service.name}</h3>
-                           <p className="text-sm font-black text-primary mt-1">Starting from ₹{service.price}</p>
+                          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                             {service.name}
+                             {service.serviceType !== 'home' && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase tracking-widest ${service.serviceType === '24x7' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-purple-50 text-purple-600 border-purple-200'}`}>
+                                  {service.serviceType}
+                                </span>
+                             )}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{service.duration}</span>
+                            <span className="text-[10px] text-primary font-bold">{service.plans.length} Options</span>
+                          </div>
+                          {service.description && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{service.description}</p>}
                         </div>
-                        <div className="shrink-0 flex items-center">
-                           {isAdded ? (
-                             <div className="flex items-center gap-3 bg-white shadow-sm border border-primary/20 p-1 rounded-xl">
-                                <button onClick={() => removeFromCart(planId)} className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center"><Minus className="h-4 w-4 text-primary" /></button>
-                                <span className="font-black text-sm">{cart[planId]}</span>
-                                <button onClick={() => addToCart(planId)} className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-md"><Plus className="h-4 w-4 text-white" /></button>
-                             </div>
-                           ) : (
-                             <button onClick={() => addToCart(planId)} className="bg-primary text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase shadow-lg shadow-primary/20 active:scale-95 transition-all">Add to Bag</button>
-                           )}
-                        </div>
-                     </div>
-
-                     {/* Dynamic Add-Ons Section */}
-                     {(service.addOns || []).length > 0 && isAdded && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mt-6 pt-5 border-t border-dashed border-primary/20">
-                           <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-4">✨ Customize with Add-on Styles</h4>
-                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {service.addOns.map(addon => {
-                                const isSelected = (selectedAddOns[planId] || []).find(a => a.id === addon.id);
-                                return (
-                                  <button key={addon.id} onClick={() => toggleAddOn(planId, addon)} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${isSelected ? 'border-primary bg-primary/10' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
-                                     <div className={`h-8 w-8 rounded-full mb-2 flex items-center justify-center ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                        {isSelected ? <CheckCircle className="h-5 w-5" /> : <Plus className="h-4 w-4" />}
-                                     </div>
-                                     <p className="text-[10px] font-black leading-tight text-center">{addon.name}</p>
-                                     <p className="text-[9px] font-bold text-emerald-600 mt-1">+₹{addon.price}</p>
-                                  </button>
-                                );
-                              })}
-                           </div>
-                        </motion.div>
-                     )}
-                  </div>
-                  
-                  {isAdded && (
-                    <div className="bg-primary/10 px-6 py-3 border-t border-primary/10 flex justify-between items-center rounded-b-3xl">
-                       <span className="text-[10px] font-black text-primary uppercase">Current Subtotal</span>
-                       <span className="text-sm font-black text-primary">₹{getPlanTotal(planId, parseInt(service.price))}</span>
+                      </div>
+                      <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${expandedPlan === service.id ? "rotate-180" : ""}`} />
                     </div>
-                  )}
-               </div>
-             );
-           })}
-        </div>
+                  </div>
+
+                  <AnimatePresence>
+                    {(expandedPlan === service.id || servicesList.length === 1) && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-border bg-muted/20">
+                        {service.plans.map((plan, i) => (
+                          <div key={plan.id} className={`p-4 flex items-center justify-between gap-4 ${i !== service.plans.length - 1 ? "border-b border-border/50" : ""}`}>
+                            <div className="flex-1">
+                              <h4 className="text-sm font-bold text-foreground">{plan.name}</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5">{plan.desc}</p>
+                              <p className="text-sm font-black text-primary mt-1">₹{plan.price}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {cart[plan.id] ? (
+                                <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-1">
+                                  <button onClick={() => removeFromCart(plan.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-background shadow-sm"><Minus className="h-3.5 w-3.5 text-primary" /></button>
+                                  <span className="w-4 text-center text-sm font-bold">{cart[plan.id]}</span>
+                                  <button onClick={() => addToCart(plan.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm"><Plus className="h-3.5 w-3.5" /></button>
+                                </div>
+                              ) : (
+                                <button onClick={() => addToCart(plan.id)} className="rounded-xl border border-primary/30 bg-primary/5 px-5 py-2 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground transition-all">
+                                  ADD
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))
+              )}
+            </motion.div>
+          )}
+
+          {tab === "reviews" && (
+            <motion.div key="reviews" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+              <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5">
+                <div className="text-center w-20">
+                  <p className="text-4xl font-black text-foreground">{provider.rating}</p>
+                  <div className="flex justify-center gap-0.5 mt-1">
+                    {[1,2,3,4,5].map(s => <Star key={s} className={`h-3 w-3 ${s<=Math.round(provider.rating) ? "fill-amber-400 text-amber-400" : "text-border"}`} />)}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">{provider.reviews} ratings</p>
+                </div>
+                <div className="flex-1 space-y-1.5 border-l border-border pl-4">
+                  {[5,4,3,2,1].map((n, i) => (
+                    <div key={n} className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold w-2">{n}</span><Star className="h-2 w-2 text-muted-foreground" />
+                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${100 - i*20}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {fakeReviews.map(r => (
+                  <div key={r.id} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{r.user.substring(0,2)}</div>
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{r.user}</p>
+                          <p className="text-[10px] text-muted-foreground">{r.date}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5">{[1,2,3,4,5].map(s => <Star key={s} className={`h-3 w-3 ${s<=r.rating ? "fill-amber-400 text-amber-400" : "text-border"}`} />)}</div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{r.text}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {tab === "about" && (
+            <motion.div key="about" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h3 className="text-sm font-bold text-foreground mb-2">About Provider</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{provider.about}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2"><Camera className="h-4 w-4 text-primary" /> Previous Work</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {fakePortfolio.map(p => (
+                    <div key={p.id} className="group relative rounded-2xl overflow-hidden aspect-video border border-border">
+                      <img src={p.after} className="w-full h-full object-cover" alt="Portfolio" />
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[10px] font-bold text-white uppercase tracking-widest border border-white/50 px-2 py-1 rounded-full backdrop-blur-sm">After</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Cart Float */}
       <AnimatePresence>
         {cartCount > 0 && (
-          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-24 left-0 right-0 z-40 p-4 md:bottom-4 flex justify-center pointer-events-none">
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-20 left-0 right-0 z-40 p-4 md:bottom-4 flex justify-center pointer-events-none">
             <div className="w-full max-w-2xl pointer-events-auto">
-              <motion.button onClick={handleCheckout} className="flex w-full items-center justify-between rounded-3xl bg-gray-900 px-6 py-5 shadow-2xl text-white">
-                <div className="text-left">
-                  <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{cartCount} Items in bag</p>
-                  <p className="text-xl font-black">₹{cartTotal}</p>
+              <motion.button onClick={handleCheckout} className="flex w-full items-center justify-between rounded-2xl bg-foreground px-6 py-4 shadow-2xl shadow-black/20 group">
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-semibold text-background/70">{cartCount} items selected</span>
+                  <span className="text-lg font-black text-background">₹{cartTotal}</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/10 px-5 py-2.5 rounded-2xl font-black text-xs uppercase">
-                  Proceed to Checkout <ArrowLeft className="h-4 w-4 rotate-180" />
+                <div className="flex items-center gap-2 rounded-xl bg-background/10 px-4 py-2 text-sm font-bold text-background group-hover:bg-background/20 transition-all">
+                  Next <ArrowLeft className="h-4 w-4 rotate-180" />
                 </div>
               </motion.button>
             </div>
